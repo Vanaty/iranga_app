@@ -14,8 +14,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { LogIn } from 'lucide-react-native';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('eric');
+  const [password, setPassword] = useState('test@user');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();

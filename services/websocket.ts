@@ -1,18 +1,20 @@
+import { Config } from '@/config/Config';
 import type { InstantMessage, Message, Publication } from '../types/chat';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 export class WebSocketService {
+  private wsUrl: string = Config.WEBSOCKET_URL;
   private client: Client | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectInterval = 3000;
+  private reconnectInterval = 10000;
 
   constructor(
     private onMessage: (message: Message) => void, 
     private onUserStatusChange: (users: string[]) => void,
-    private onTypingStatusChange?: (chatId: number, users: string[]) => void,
+    private onTypingStatusChange?: (chatId: number, user: string) => void,
     private onMessageRead?: (chatId: number, messageId: number) => void,
     private onNewPublication?: (publication: Publication) => void,
     private onPublicationUpdate?: (publication: Publication) => void,
@@ -23,7 +25,7 @@ export class WebSocketService {
     return new Promise((resolve, reject) => {
       try {
         this.client = new Client({
-          webSocketFactory: () => new SockJS('http://192.168.1.109:8080/ws'),
+          webSocketFactory: () => new SockJS(this.wsUrl),
           connectHeaders: {
             Authorization: `Bearer ${token}`,
           },
@@ -108,6 +110,7 @@ export class WebSocketService {
     const messageSubscription = this.client.subscribe(`/topic/chat/${chatId}`, (message) => {
       try {
         const chatMessage: Message = JSON.parse(message.body);
+        console.log("Received chat message:", chatMessage);
         this.onMessage(chatMessage);
       } catch (error) {
         console.error('Error parsing message:', error);
@@ -118,7 +121,7 @@ export class WebSocketService {
       try {
         const typingData = JSON.parse(message.body);
         if (this.onTypingStatusChange) {
-          this.onTypingStatusChange(chatId, typingData.users || []);
+          this.onTypingStatusChange(chatId, typingData.username);
         }
       } catch (error) {
         console.error('Error parsing typing status:', error);
@@ -150,7 +153,7 @@ export class WebSocketService {
     }
 
     this.client.publish({
-      destination: `/app/chat/${chatId}/send`,
+      destination: `/app/chat.message`,
       body: JSON.stringify(message),
     });
   }
@@ -162,7 +165,7 @@ export class WebSocketService {
 
     this.client.publish({
       destination: `/app/chat/${chatId}/typing`,
-      body: JSON.stringify({ isTyping }),
+      body: JSON.stringify({ typing: isTyping }),
     });
   }
 

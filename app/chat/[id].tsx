@@ -1,45 +1,85 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  StatusBar,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { GiftedChat, IMessage, InputToolbar, Send } from 'react-native-gifted-chat';
-import { Message, MessageType, Chat } from '@/types/chat';
+import { useLocalSearchParams, Link } from 'expo-router';
+import { Message, MessageType, Chat, InstantMessage } from '@/types/chat';
 import { chatAPI } from '@/services/api';
 import { StorageService } from '@/services/storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
-import { ArrowLeft, Phone, Video, MoreVertical } from 'lucide-react-native';
+import { MessageBubble } from '@/components/MessageBubble';
+import { ChatInput } from '@/components/ChatInput';
+import { ArrowLeft, Phone, Video, MoreVertical, Circle } from 'lucide-react-native';
+import { FileUploadService } from '@/services/fileUpload';
+import { FileUploadProgress } from '@/components/FileUploadProgress';
+import { Colors } from '@/constants/Colors';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [messages, setMessages] = useState<IMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [chatInfo, setChatInfo] = useState<Chat | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const router = useRouter();
+  const [uploadingFiles, setUploadingFiles] = useState<Array<{
+    id: string;
+    name: string;
+    progress: number;
+    status: 'uploading' | 'success' | 'error';
+    error?: string;
+  }>>([]);
+  const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
-  const { typingUsers, webSocketService } = useChat();
-
+  const { typingUser, messages: contextMessages, setChatMessages, webSocketService, markMessageAsRead } = useChat();
   const chatId = parseInt(id as string, 10);
+  const [messages, setMessages] = useState<Message[]>(contextMessages[chatId] || []);
 
   useEffect(() => {
     if (chatId && !isNaN(chatId)) {
-      loadMessages();
       loadChatInfo();
+      loadMessages();
+      
+      // Marquer les messages comme lus quand on ouvre le chat
+      markReadMessages();
     }
-  }, [chatId]);
+  }, [chatId, user]);
+
+  // Marquer comme lu quand on quitte le chat
+  useEffect(() => {
+    return () => {
+      markReadMessages();
+    }
+  }, [chatId, user]);
 
   useEffect(() => {
-    // Check if other users are typing
-    const currentTypingUsers = typingUsers[chatId] || [];
-    const othersTyping = currentTypingUsers.filter(username => username !== user?.username);
-    setIsTyping(othersTyping.length > 0);
-  }, [typingUsers, chatId, user?.username]);
+    const currentTypingUser = typingUser[chatId];
+    console.log(currentTypingUser);
+    if(!isTyping) {
+      setIsTyping(!!currentTypingUser && currentTypingUser !== user?.username);
+      setTimeout(() => {
+        setIsTyping(false);
+      }, 5000);
+    }
+  }, [typingUser, chatId, user?.username]);
+
+  useEffect(() => {
+    setMessages(contextMessages[chatId] || []);
+  }, [contextMessages, chatId]);
+
+  const markReadMessages = () => {
+    if (user && chatId) {
+      messages.forEach(message => {
+        if (!message.read && message.sender.id !== user.id) {
+          markMessageAsRead(chatId, message.id);
+        }
+      });
+    }
+  };
 
   const loadChatInfo = async () => {
     try {
@@ -53,14 +93,18 @@ export default function ChatScreen() {
 
   const loadMessages = async () => {
     try {
+      // Charger les messages reçus depuis le cache local
       const localMessages = await StorageService.getMessages(chatId);
       if (localMessages.length > 0) {
-        setMessages(convertToGiftedMessages(localMessages));
+        setChatMessages(chatId, localMessages);
+        setMessages(localMessages);
       }
 
+      // Synchroniser avec le serveur pour avoir tous les messages (envoyés + reçus)
       const response = await chatAPI.getChatMessages(chatId);
       const serverMessages = response.content;
-      setMessages(convertToGiftedMessages(serverMessages));
+      setChatMessages(chatId, serverMessages);
+      setMessages(serverMessages);
       await StorageService.saveMessages(chatId, serverMessages);
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
@@ -69,62 +113,100 @@ export default function ChatScreen() {
     }
   };
 
-  const convertToGiftedMessages = (apiMessages: Message[]): IMessage[] => {
-    return apiMessages.map(msg => ({
-      _id: msg.id,
-      text: msg.contentText,
-      createdAt: new Date(msg.timestamp),
-      user: {
-        _id: msg.sender.id,
-        name: `${msg.sender.firstName} ${msg.sender.lastName}`,
-        avatar: msg.sender.profilePictureUrl,
-      },
-      image: msg.type === MessageType.IMAGE ? msg.fileUrl : undefined,
-      video: msg.type === MessageType.VIDEO ? msg.fileUrl : undefined,
-      sent: msg.sender.id === user?.id,
-      received: msg.read,
-    }));
-  };
-
-  const onSend = useCallback((newMessages: IMessage[] = []) => {
+  const handleSendMessage = (text: string) => {
     if (!user || !chatInfo) return;
-    
-    const message = newMessages[0];
-    
-    // Optimistically update UI
-    setMessages(previousMessages => GiftedChat.append(previousMessages, newMessages));
-
-    // Send message via WebSocket
     if (webSocketService) {
       const messageData = {
-        content: message.text,
+        content: text,
         sender: user.id,
         receiver: chatId,
         messageType: MessageType.TEXT,
       };
-      
       webSocketService.sendMessage(chatId, messageData);
     }
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }, 100);
+  };
 
-    // Save locally
-    const apiMessage: Message = {
-      id: message._id as number,
-      contentText: message.text,
-      timestamp: message.createdAt.toISOString(),
-      type: MessageType.TEXT,
-      sender: user,
-      chat: chatInfo,
-      read: false,
-    };
-    
-    StorageService.addMessage(chatId, apiMessage).catch(console.error);
-  }, [chatId, webSocketService, user, chatInfo]);
-
-  const onInputTextChanged = useCallback((text: string) => {
+  const handleTyping = (typing: boolean) => {
     if (webSocketService) {
-      webSocketService.sendTypingStatus(chatId, text.length > 0);
+      webSocketService.sendTypingStatus(chatId, typing);
     }
-  }, [webSocketService, chatId]);
+  };
+
+  const handleSendFile = async (file: { uri: string; type: string; name: string }) => {
+    if (!user || !chatInfo) return;
+
+    const uploadId = `upload_${Date.now()}`;
+    
+    // Ajouter à la liste des uploads
+    setUploadingFiles(prev => [...prev, {
+      id: uploadId,
+      name: file.name,
+      progress: 0,
+      status: 'uploading',
+    }]);
+
+    try {
+      const response = await FileUploadService.uploadFile(file, chatId, {
+        onProgress: (progress) => {
+          setUploadingFiles(prev => prev.map(upload => 
+            upload.id === uploadId 
+              ? { ...upload, progress: progress.percentage }
+              : upload
+          ));
+        },
+        onSuccess: (uploadResponse) => {
+          // Créer un message avec le fichier pour affichage optimiste
+          const messageType = file.type === 'image' ? MessageType.IMAGE : 
+                             file.type === 'video' ? MessageType.VIDEO : MessageType.FILE;
+
+          // Envoyer via WebSocket - sera persisté au retour
+          if (webSocketService) {
+            const messageData = {
+              content: '',
+              fileUrl: uploadResponse.fileDownloadUri,
+              thumbnailUrl: uploadResponse.fileThumbnailUri,
+              sender: user.id,
+              receiver: chatId,
+              type: messageType,
+            };
+            webSocketService.sendMessage(chatId, messageData);
+          }
+
+          setUploadingFiles(prev => prev.map(upload => 
+            upload.id === uploadId 
+              ? { ...upload, status: 'success', progress: 100 }
+              : upload
+          ));
+
+          // Supprimer l'upload après 2 secondes
+          setTimeout(() => {
+            setUploadingFiles(prev => prev.filter(upload => upload.id !== uploadId));
+          }, 2000);
+        },
+        onError: (error) => {
+          setUploadingFiles(prev => prev.map(upload => 
+            upload.id === uploadId 
+              ? { ...upload, status: 'error', error: error.message }
+              : upload
+          ));
+        },
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'upload:', error);
+    }
+  };
+
+  const handleCancelUpload = (uploadId: string) => {
+    setUploadingFiles(prev => prev.filter(upload => upload.id !== uploadId));
+  };
+
+  const handleRetryUpload = (uploadId: string) => {
+    // Réimplémentation simple - dans une vraie app, vous garderiez les données du fichier
+    setUploadingFiles(prev => prev.filter(upload => upload.id !== uploadId));
+  };
 
   const getChatTitle = () => {
     if (!chatInfo) return 'Discussion';
@@ -134,21 +216,29 @@ export default function ChatScreen() {
     } else {
       const otherParticipant = chatInfo.participants.find(p => p.user.id !== user?.id);
       return otherParticipant 
-        ? `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`
+        ? `${otherParticipant.user.firstName}`
         : 'Discussion';
     }
   };
 
-  const handleCall = () => {
-    Alert.alert('Appel', 'Fonctionnalité d\'appel à venir');
+  const getOtherParticipant = () => {
+    if (!chatInfo || chatInfo.isGroupChat) return null;
+    return chatInfo.participants.find(p => p.user.id !== user?.id)?.user;
   };
 
-  const handleVideoCall = () => {
-    Alert.alert('Appel vidéo', 'Fonctionnalité d\'appel vidéo à venir');
-  };
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+    const isMyMessage = item.sender.id === user?.id;
+    const nextMessage = index > 0 ? messages[index - 1] : null;
+    const showTimestamp = !nextMessage || 
+      new Date(item.timestamp).getTime() - new Date(nextMessage.timestamp).getTime() > 300000; // 5 minutes
 
-  const handleMore = () => {
-    Alert.alert('Options', 'Plus d\'options à venir');
+    return (
+      <MessageBubble
+        message={item}
+        isMyMessage={isMyMessage}
+        showTimestamp={showTimestamp}
+      />
+    );
   };
 
   if (isLoading) {
@@ -167,72 +257,93 @@ export default function ChatScreen() {
     );
   }
 
+  const otherUser = getOtherParticipant();
+
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor="#128C7E" barStyle="light-content" />
+      
+      {/* Header WhatsApp-like */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color="#3B82F6" />
-        </TouchableOpacity>
+        <Link href="/(tabs)" asChild>
+          <TouchableOpacity style={styles.backButton}>
+            <ArrowLeft size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Link>
         
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{getChatTitle()}</Text>
-          {isTyping && (
-            <Text style={styles.typingIndicator}>En train d'écrire...</Text>
-          )}
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {chatInfo?.isGroupChat 
+                ? 'G'
+                : otherUser?.firstName?.charAt(0)?.toUpperCase() || '?'
+              }
+            </Text>
+          </View>
+          
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>{getChatTitle()}</Text>
+            {isTyping ? (
+              <Text style={styles.typingIndicator}>en train d'écrire...</Text>
+            ) : (
+              <View style={styles.statusContainer}>
+                <Circle size={8} color="#4FC3F7" fill="#4FC3F7" />
+                <Text style={styles.statusText}>en ligne</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
-            <Phone size={20} color="#6B7280" />
+          <TouchableOpacity style={styles.actionButton}>
+            <Phone size={20} color="#FFFFFF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleVideoCall}>
-            <Video size={20} color="#6B7280" />
+          <TouchableOpacity style={styles.actionButton}>
+            <Video size={20} color="#FFFFFF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleMore}>
-            <MoreVertical size={20} color="#6B7280" />
+          <TouchableOpacity style={styles.actionButton}>
+            <MoreVertical size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <GiftedChat
-        messages={messages}
-        onSend={onSend}
-        onInputTextChanged={onInputTextChanged}
-        user={{
-          _id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          avatar: user.profilePictureUrl,
-        }}
-        renderAvatar={(props) => (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {props.currentMessage?.user.name?.charAt(0)?.toUpperCase() || '?'}
-            </Text>
+      {/* Background pattern */}
+      <View style={styles.chatBackground}>
+        {/* Indicateurs d'upload */}
+        {uploadingFiles.length > 0 && (
+          <View style={styles.uploadContainer}>
+            {uploadingFiles.map(upload => (
+              <FileUploadProgress
+                key={upload.id}
+                fileName={upload.name}
+                progress={upload.progress}
+                status={upload.status}
+                error={upload.error}
+                onCancel={() => handleCancelUpload(upload.id)}
+                onRetry={() => handleRetryUpload(upload.id)}
+              />
+            ))}
           </View>
         )}
-        showUserAvatar
-        showAvatarForEveryMessage={false}
-        placeholder="Tapez votre message..."
-        alwaysShowSend
-        keyboardShouldPersistTaps="never"
-        renderInputToolbar={props => (
-          <InputToolbar
-            {...props}
-            containerStyle={styles.inputContainer}
-          />
-        )}
-        renderSend={props => (
-          <Send
-            {...props}
-            containerStyle={styles.sendButtonContainer}
-          >
-            <Text style={styles.sendButtonText}>Envoyer</Text>
-          </Send>
-        )}
-        messagesContainerStyle={styles.messageContainer}
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContainer}
+          inverted
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+
+      {/* Input zone */}
+      <ChatInput
+        onSendMessage={handleSendMessage}
+        onSendFile={handleSendFile}
+        onTyping={handleTyping}
+        placeholder="Message"
       />
     </View>
   );
@@ -241,99 +352,113 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.chat,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.chat,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: Colors.primary.dark,
+    elevation: 8,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   backButton: {
-    padding: 8,
+    padding: 10,
     marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primary.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+    elevation: 2,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  avatarText: {
+    color: Colors.text.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.white,
+    letterSpacing: 0.3,
   },
   typingIndicator: {
-    fontSize: 12,
-    color: '#10B981',
+    fontSize: 13,
+    color: Colors.status.typing,
     fontStyle: 'italic',
     marginTop: 2,
+    fontWeight: '600',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  statusText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionButton: {
-    padding: 8,
-    marginLeft: 4,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  textInput: {
-    backgroundColor: '#F9FAFB',
+    padding: 10,
+    marginLeft: 6,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  chatBackground: {
+    flex: 1,
+    backgroundColor: Colors.background.chat,
+  },
+  messagesList: {
+    flex: 1,
+  },
+  messagesContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginHorizontal: 8,
-    fontSize: 16,
-    maxHeight: 100
+    paddingVertical: 12,
   },
-  sendButtonContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginRight: 10,
-  },
-  sendButtonText: {
-    color: '#3B82F6',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  messageContainer: {
-    backgroundColor: '#F9FAFB',
-  },
-  inputContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingVertical: 8,
+  uploadContainer: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     paddingHorizontal: 12,
   },
 });

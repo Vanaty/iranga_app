@@ -1,8 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LoginRequest, RegisterRequest, User, Chat, Message, AuthResponse, FileResponse, Publication, CreatePublicationRequest, Comment, CreateCommentRequest } from '@/types/chat';
+import { Config } from '@/config/Config';
 
-const API_BASE_URL = 'http://192.168.1.109:8080/api';
+const API_BASE_URL = Config.API_BASE_URL;
+console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -68,6 +70,11 @@ export const userAPI = {
 
 // Chat Management
 export const chatAPI = {
+  getChatById: async (id: number): Promise<Chat> => {
+    const response = await api.get(`/chats/${id}`);
+    return response.data;
+  },
+
   getUserChats: async (page = 0, size = 20): Promise<{ content: Chat[]; totalPages: number; totalElements: number }> => {
     const response = await api.get(`/chats?page=${page}&size=${size}`);
     return response.data;

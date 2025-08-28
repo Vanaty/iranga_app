@@ -41,10 +41,6 @@ export interface Message {
   sender: User;
   chat: Chat;
   read: boolean;
-  fileUrl?: string;
-  thumbnailUrl?: string;
-  fileName?: string;
-  fileSize?: number;
 }
 
 export interface InstantMessage {
@@ -66,11 +62,11 @@ export interface Media {
 }
 
 export enum MessageType {
-  TEXT = "TEXT",
-  IMAGE = "IMAGE",
-  VIDEO = "VIDEO",
-  AUDIO = "AUDIO",
-  FILE = "FILE"
+  TEXT = 'TEXT',
+  IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+  FILE = 'FILE',
+  AUDIO = 'AUDIO'
 }
 
 export interface LoginRequest {

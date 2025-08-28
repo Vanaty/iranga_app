@@ -67,6 +67,7 @@ export default function RegisterScreen() {
       });
       
       if (success) {
+        // Garder router.replace pour la redirection après inscription
         router.replace('/(tabs)');
       } else {
         Alert.alert('Erreur', 'Échec de l\'inscription');
