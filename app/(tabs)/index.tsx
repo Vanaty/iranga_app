@@ -15,37 +15,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { GroupChatCreation } from '@/components/GroupChatCreation';
 
 export default function ChatsScreen() {
-  const { chats, unreadByChat } = useChat();
+  const { chats,addChat, unreadByChat } = useChat();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastMessages, setLastMessages] = useState<{ [chatId: number]: any }>({});
   const { isConnected, webSocketService } = useChat();
   const router = useRouter();
   const { user } = useAuth();
-
-  useEffect(() => {
-    loadLastMessages();
-  }, [chats]);
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
 
   useEffect(() => {
     if (!isConnected || !webSocketService) return;
-
-    // tableau de fonctions de désabonnement
-    const unsubscribes: (() => void)[] = [];
-
-    chats.forEach(chat => {
-      const unsubscribe = webSocketService.subscribeToChat(chat.id);
-      unsubscribes.push(unsubscribe);
-    });
-
-    // cleanup -> désabonnement quand chats change ou au démontage
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-    };
-  }, [isConnected, chats, webSocketService]);
-
+    loadLastMessages();
+  }, [chats]);
 
   const loadLastMessages = async () => {
     const lastMessagesData: { [chatId: number]: any } = {};
@@ -76,7 +61,7 @@ export default function ChatsScreen() {
       return chat.chatName || 'Chat de groupe';
     }
     const otherUser = getOtherParticipant(chat);
-    return otherUser ? `${otherUser.firstName} ${otherUser.lastName}` : 'Utilisateur inconnu';
+    return otherUser ? `${otherUser.firstName}` : 'Utilisateur inconnu';
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => {
@@ -122,7 +107,7 @@ export default function ChatsScreen() {
                 : lastMessage.content
               : item.isGroupChat
                 ? `${item.participants.length} participants`
-                : '@' + otherUser?.username
+                : '@' + otherUser?.role?.libelle
             }
           </Text>
         </View>
@@ -147,6 +132,35 @@ export default function ChatsScreen() {
     );
   };
 
+  const handleGroupCreated = (chat: Chat) => {
+    addChat(chat);
+    // Naviguer vers le nouveau chat de groupe
+    router.push(`/chat/${chat.id}`);
+    // Recharger la liste des chats
+    onRefresh();
+  };
+
+  const showCreateOptions = () => {
+    Alert.alert(
+      'Nouveau chat',
+      'Choisissez le type de conversation',
+      [
+        {
+          text: 'Chat privé',
+          onPress: () => router.push('/(tabs)/users'),
+        },
+        {
+          text: 'Groupe',
+          onPress: () => setShowGroupCreation(true),
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
   if (isLoading && chats.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -162,7 +176,7 @@ export default function ChatsScreen() {
         <Text style={styles.headerTitle}>Discussions</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => Alert.alert('Nouveau chat', 'Fonctionnalité à venir')}
+          onPress={showCreateOptions}
         >
           <Plus size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -187,6 +201,12 @@ export default function ChatsScreen() {
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <GroupChatCreation
+        visible={showGroupCreation}
+        onClose={() => setShowGroupCreation(false)}
+        onGroupCreated={handleGroupCreated}
+      />
     </View>
   );
 }
@@ -201,11 +221,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
     backgroundColor: Colors.primary.main,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
     elevation: 8,
     shadowColor: Colors.ui.shadow,
     shadowOffset: { width: 0, height: 4 },
@@ -214,15 +235,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '600',
     color: Colors.text.white,
     letterSpacing: 0.5,
   },
   addButton: {
     backgroundColor: Colors.primary.accent,
     borderRadius: 25,
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
+    margin: 5,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,

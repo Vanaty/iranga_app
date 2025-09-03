@@ -16,10 +16,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { MessageBubble } from '@/components/MessageBubble';
 import { ChatInput } from '@/components/ChatInput';
-import { ArrowLeft, Phone, Video, MoreVertical, Circle } from 'lucide-react-native';
+import { ArrowLeft, Phone, Video, MoreVertical, Circle, UsersIcon } from 'lucide-react-native';
 import { FileUploadService } from '@/services/fileUpload';
 import { FileUploadProgress } from '@/components/FileUploadProgress';
 import { Colors } from '@/constants/Colors';
+import TypingIndicator from '@/components/messages/TypingIndicator';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,6 +39,7 @@ export default function ChatScreen() {
   const { typingUser, messages: contextMessages, setChatMessages, webSocketService, markMessageAsRead } = useChat();
   const chatId = parseInt(id as string, 10);
   const [messages, setMessages] = useState<Message[]>(contextMessages[chatId] || []);
+  const [typingUserName, setTypingUserName] = useState<string | null>(null);
 
   useEffect(() => {
     if (chatId && !isNaN(chatId)) {
@@ -47,29 +49,32 @@ export default function ChatScreen() {
       // Marquer les messages comme lus quand on ouvre le chat
       markReadMessages();
     }
-  }, [chatId, user]);
-
-  // Marquer comme lu quand on quitte le chat
-  useEffect(() => {
-    return () => {
-      markReadMessages();
-    }
-  }, [chatId, user]);
+  }, [chatId, user, webSocketService?.isWebSocketConnected()]);
 
   useEffect(() => {
-    const currentTypingUser = typingUser[chatId];
-    console.log(currentTypingUser);
-    if(!isTyping) {
-      setIsTyping(!!currentTypingUser && currentTypingUser !== user?.username);
-      setTimeout(() => {
+    let currentTypingUser = typingUser[chatId];
+    if (currentTypingUser && currentTypingUser.length > 0) {
+      currentTypingUser = currentTypingUser.filter(u => u !== user?.username);
+      if (currentTypingUser.length > 0) {
+        setTypingUserName(currentTypingUser?.join(', '));
+        setIsTyping(true);
+      } else {
         setIsTyping(false);
-      }, 5000);
+        setTypingUserName(null);
+      }
+    } else {
+      setIsTyping(false);
+      setTypingUserName(null);
     }
   }, [typingUser, chatId, user?.username]);
 
   useEffect(() => {
     setMessages(contextMessages[chatId] || []);
   }, [contextMessages, chatId]);
+
+  useEffect(() => {
+    markReadMessages();
+  }, [contextMessages]);
 
   const markReadMessages = () => {
     if (user && chatId) {
@@ -114,7 +119,7 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = (text: string) => {
-    if (!user || !chatInfo) return;
+    if (!user || !chatInfo || text.length === 0) return;
     if (webSocketService) {
       const messageData = {
         content: text,
@@ -273,18 +278,21 @@ export default function ChatScreen() {
         
         <View style={styles.headerContent}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {chatInfo?.isGroupChat 
-                ? 'G'
-                : otherUser?.firstName?.charAt(0)?.toUpperCase() || '?'
-              }
-            </Text>
+              {chatInfo?.isGroupChat ? (
+                <UsersIcon size={24} color={Colors.text.white} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {otherUser?.firstName?.charAt(0)?.toUpperCase() || '?'}
+                </Text>
+              )}
           </View>
           
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>{getChatTitle()}</Text>
-            {isTyping ? (
-              <Text style={styles.typingIndicator}>en train d'écrire...</Text>
+            {isTyping && typingUserName ? (
+              <Text style={styles.typingText}>
+                {chatInfo?.isGroupChat ? `${typingUserName} écrit...` : 'Écrit...'}
+              </Text>
             ) : (
               <View style={styles.statusContainer}>
                 <Circle size={8} color="#4FC3F7" fill="#4FC3F7" />
@@ -335,6 +343,15 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messagesContainer}
           inverted
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={() => (
+            isTyping ? (
+              <TypingIndicator
+                userName={chatInfo?.isGroupChat ? (typingUserName ? typingUserName : undefined) : undefined}
+                showUserName={chatInfo?.isGroupChat}
+                style={styles.typingIndicatorMessage}
+              />
+            ) : null
+          )}
         />
       </View>
 
@@ -364,8 +381,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 10,
     backgroundColor: Colors.primary.dark,
     elevation: 8,
     shadowColor: Colors.ui.shadow,
@@ -414,7 +430,7 @@ const styles = StyleSheet.create({
     color: Colors.text.white,
     letterSpacing: 0.3,
   },
-  typingIndicator: {
+  typingText: {
     fontSize: 13,
     color: Colors.status.typing,
     fontStyle: 'italic',
@@ -460,5 +476,8 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
     paddingHorizontal: 12,
+  },
+  typingIndicatorMessage: {
+    marginBottom: 8,
   },
 });

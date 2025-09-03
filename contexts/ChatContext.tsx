@@ -11,7 +11,7 @@ interface ChatContextType {
   chats: Chat[];
   messages: { [chatId: number]: Message[] };
   onlineUsers: string[];
-  typingUser: { [chatId: number]: string };
+  typingUser: { [chatId: number]: string[] };
   unreadMessages: number;
   unreadByChat: { [chatId: number]: number };
   isConnected: boolean;
@@ -19,6 +19,7 @@ interface ChatContextType {
   refreshPublications: () => Promise<void>;
   addPublication: (publication: Publication) => void;
   updatePublication: (publication: Publication) => void;
+  addChat: (chat: Chat) => void;
   addMessage: (message: Message) => void;
   connectWebSocket: () => Promise<void>;
   disconnectWebSocket: () => void;
@@ -34,7 +35,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<{ [chatId: number]: Message[] }>({});
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  const [typingUser, setTypingUser] = useState<{ [chatId: number]: string }>({});
+  const [typingUser, setTypingUser] = useState<{ [chatId: number]: string[] }>({});
   const [unreadMessages, setUnreadMessages] = useState(10);
   const [unreadByChat, setUnreadByChat] = useState<{ [chatId: number]: number }>({});
   const [webSocketService, setWebSocketService] = useState<WebSocketService | null>(null);
@@ -58,15 +59,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       acc[chat.id] = messages[chat.id]?.filter(msg => !msg.read && msg.sender.id !== user?.id).length || 0;
       return acc;
     }, {} as { [chatId: number]: number });
-
+    setUnreadMessages(Object.values(unreadCounts).reduce((a, b) => a + b, 0));
     setUnreadByChat(unreadCounts);
   }, [messages, user]);
+
+    useEffect(() => {
+      if (webSocketService?.isWebSocketConnected()) {
+        console.log('Subscribing to chat updates via WebSocket', chats);
+        const unsubscribes: (() => void)[] = [];
+    
+        chats.forEach(chat => {
+          const unsubscribe = webSocketService.subscribeToChat(chat.id);
+          unsubscribes.push(unsubscribe);
+        });
+    
+        return () => {
+          unsubscribes.forEach(unsub => unsub());
+        };
+      }
+  }, [chats, webSocketService?.isWebSocketConnected()]);
 
   const loadInitialData = async () => {
     try {
       await Promise.all([
-        refreshPublications(),
         loadChats(),
+        refreshPublications(),
       ]);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -90,6 +107,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addChat = (chat: Chat) => {
+    setChats(prev => [...prev, chat]);
+  };
+
   const loadChats = async () => {
     try {
       // Charger depuis le cache local d'abord
@@ -102,6 +123,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const response = await chatAPI.getUserChats();
       setChats(response.content);
       await StorageService.saveChats(response.content);
+
     } catch (error) {
       console.error('Error loading chats:', error);
     }
@@ -110,16 +132,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const initializeWebSocket = async () => {
     if (!user) return;
 
-    const handleTypingUser = (chatId: number, user: string) => {
+    const handleTypingUser = (chatId: number, user: string, isTyping: boolean) => {
       setTypingUser(prev => ({
         ...prev,
-        [chatId]: user,
+        [chatId]: isTyping
+          ? [...(prev[chatId] || []), user]
+          : prev[chatId]?.filter(u => u !== user) || [],
       }));
     };
 
     try {
       const token = await StorageService.getAuthToken();
       if (!token) return;
+
+      // Déconnecter le service précédent s'il existe
+      if (webSocketService) {
+        webSocketService.disconnect();
+      }
 
       const wsService = new WebSocketService(
         handleNewMessage,
@@ -134,6 +163,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       await wsService.connect(token);
       setWebSocketService(wsService);
       setIsConnected(true);
+      console.log('WebSocket service initialized successfully');
     } catch (error) {
       console.error('Error initializing WebSocket:', error);
       setIsConnected(false);
@@ -262,6 +292,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         addPublication,
         updatePublication,
         addMessage,
+        addChat,
         connectWebSocket,
         disconnectWebSocket,
         markMessageAsRead,

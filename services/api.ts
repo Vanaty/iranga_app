@@ -57,7 +57,7 @@ export const userAPI = {
     return response.data;
   },
 
-  getAllUsers: async (): Promise<string[]> => {
+  getAllUsers: async (): Promise<User[]> => {
     const response = await api.get('/users');
     return response.data;
   },
@@ -66,6 +66,9 @@ export const userAPI = {
     const response = await api.get('/users/online');
     return response.data;
   },
+  updateExpoToken: async (token: string): Promise<void> => {
+    await api.post('/users/expo/token', { token });
+  }
 };
 
 // Chat Management
@@ -130,7 +133,7 @@ export const publicationAPI = {
   },
 
   unlikePublication: async (id: number): Promise<void> => {
-    await api.delete(`/publications/${id}/unlike`);
+    await api.delete(`/publications/${id}/like`);
   },
 
   getPublicationComments: async (id: number, page = 0, size = 20): Promise<{ content: Comment[]; totalPages: number; totalElements: number }> => {

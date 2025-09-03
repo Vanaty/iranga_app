@@ -64,9 +64,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setupNotifications = async () => {
     try {
-      await NotificationService.registerForPushNotificationsAsync();
+      const token = await NotificationService.registerForPushNotificationsAsync();
+      
+      // Si un token est obtenu et que l'utilisateur est connecté, l'envoyer au backend
+      if (token && user) {
+        await saveNotificationToken(token);
+      }
     } catch (error) {
       console.error('Erreur lors de la configuration des notifications:', error);
+    }
+  };
+
+  const saveNotificationToken = async (token: string) => {
+    try {
+      await userAPI.updateExpoToken(token);
+      console.log('Token de notification sauvegardé sur le backend');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du token de notification:', error);
     }
   };
 
@@ -82,6 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Vérifier que le token a bien été sauvegardé
       const savedToken = await AsyncStorage.getItem('authToken');
       console.log('Token sauvegardé après connexion:', !!savedToken);
+      
+      // Configurer et envoyer le token de notification
+      try {
+        const notificationToken = await NotificationService.registerForPushNotificationsAsync();
+        if (notificationToken) {
+          await saveNotificationToken(notificationToken);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la configuration des notifications après connexion:', error);
+      }
       
       return true;
     } catch (error) {
@@ -103,6 +127,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Vérifier que le token a bien été sauvegardé
       const savedToken = await AsyncStorage.getItem('authToken');
       console.log('Token sauvegardé après inscription:', !!savedToken);
+      
+      // Configurer et envoyer le token de notification
+      try {
+        const notificationToken = await NotificationService.registerForPushNotificationsAsync();
+        if (notificationToken) {
+          await saveNotificationToken(notificationToken);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la configuration des notifications après inscription:', error);
+      }
       
       return true;
     } catch (error) {

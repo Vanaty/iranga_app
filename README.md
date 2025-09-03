@@ -87,12 +87,12 @@ Une application mobile React Native construite avec Expo pour la messagerie inst
 - **Gestion d'erreurs** : Retry automatique et annulation d'upload
 - **Cache intelligent** : Stockage local des fichiers fréquents
 
-### Types de Fichiers Supportés
-- **Images** : JPG, PNG, GIF, WebP avec miniatures
-- **Documents** : PDF, DOC, XLS, PPT avec icônes
-- **Vidéos** : MP4, AVI, MOV avec prévisualisation
-- **Audio** : MP3, WAV, AAC avec lecteur intégré
-- **Archives** : ZIP, RAR avec extraction
+### Chat de Groupe
+- **Création de groupes** : Interface dédiée avec sélection d'utilisateurs
+- **Gestion des participants** : Ajout/suppression avec permissions
+- **Administration** : Rôles admin et participants standard
+- **Personnalisation** : Nom de groupe et paramètres avancés
+- **Interface intuitive** : Sélection multiple avec preview des participants
 
 ## 🛠️ Technologies utilisées
 

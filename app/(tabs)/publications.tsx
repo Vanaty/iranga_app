@@ -17,6 +17,7 @@ import { PublicationCard } from '@/components/PublicationCard';
 import { useChat } from '@/contexts/ChatContext';
 import { apiService, publicationAPI } from '@/services/api';
 import { Plus, X, Send } from 'lucide-react-native';
+import { Colors } from '@/constants/Colors';
 
 export default function PublicationsScreen() {
   const { publications, refreshPublications, addPublication, updatePublication } = useChat();
@@ -193,29 +194,33 @@ export default function PublicationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 10,
+    backgroundColor: Colors.primary.main,
+    elevation: 8,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 26,
+    fontWeight: '800',
+    color: Colors.text.white,
+    letterSpacing: 0.5,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: Colors.primary.accent,
     borderRadius: 20,
     width: 40,
     height: 40,
+    margin: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },

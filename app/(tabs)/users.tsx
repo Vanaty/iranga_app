@@ -12,9 +12,10 @@ import { useRouter } from 'expo-router';
 import { userAPI, chatAPI } from '@/services/api';
 import { Users, UserPlus, Circle } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
+import { User } from '@/types/chat';
 
 export default function UsersScreen() {
-  const [allUsers, setAllUsers] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,18 +56,18 @@ export default function UsersScreen() {
     }
   };
 
-  const renderUserItem = ({ item }: { item: string }) => {
-    const isOnline = onlineUsers.includes(item);
+  const renderUserItem = ({ item }: { item: User }) => {
+    const isOnline = onlineUsers.includes(item.username);
 
     return (
       <TouchableOpacity
         style={styles.userItem}
-        onPress={() => startPrivateChat(item)}
+        onPress={() => startPrivateChat(item.username)}
       >
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {item.charAt(0).toUpperCase()}
+              {item.firstName.charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={[
@@ -75,7 +76,7 @@ export default function UsersScreen() {
           ]} />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.username}>@{item}</Text>
+          <Text style={styles.username}>{item.firstName}</Text>
           <Text style={styles.status}>
             {isOnline ? 'En ligne' : 'Hors ligne'}
           </Text>
@@ -113,7 +114,7 @@ export default function UsersScreen() {
         <FlatList
           data={allUsers}
           renderItem={renderUserItem}
-          keyExtractor={(item) => item}
+          keyExtractor={(item) => item.username}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -134,11 +135,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 10,
     backgroundColor: Colors.primary.main,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
     elevation: 8,
     shadowColor: Colors.ui.shadow,
     shadowOffset: { width: 0, height: 4 },
@@ -147,7 +145,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '600',
     color: Colors.text.white,
     letterSpacing: 0.5,
   },

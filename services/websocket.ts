@@ -14,7 +14,7 @@ export class WebSocketService {
   constructor(
     private onMessage: (message: Message) => void, 
     private onUserStatusChange: (users: string[]) => void,
-    private onTypingStatusChange?: (chatId: number, user: string) => void,
+    private onTypingStatusChange?: (chatId: number, user: string, isTyping: boolean) => void,
     private onMessageRead?: (chatId: number, messageId: number) => void,
     private onNewPublication?: (publication: Publication) => void,
     private onPublicationUpdate?: (publication: Publication) => void,
@@ -121,7 +121,7 @@ export class WebSocketService {
       try {
         const typingData = JSON.parse(message.body);
         if (this.onTypingStatusChange) {
-          this.onTypingStatusChange(chatId, typingData.username);
+          this.onTypingStatusChange(chatId, typingData.username, typingData.typing);
         }
       } catch (error) {
         console.error('Error parsing typing status:', error);

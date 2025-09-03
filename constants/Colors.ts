@@ -30,6 +30,8 @@ export const Colors = {
     online: '#38A169',    // Vert pour en ligne
     offline: '#9CA3AF',   // Gris pour hors ligne
     typing: '#ED8936',    // Orange pour frappe
+    typingBg: '#F7FAFC',  // Fond pour indicateur de frappe
+    typingDot: '#4A5568', // Couleur des points de frappe
     error: '#E53E3E',     // Rouge pour erreurs
     warning: '#D69E2E',   // Jaune pour avertissements
     success: '#38A169',   // Vert pour succès

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Message } from '@/types/chat';
 import { MessageStatus } from '../MessageStatus';
 import { File, Download, FileText, FileImage, FileVideo, Music } from 'lucide-react-native';
+import { Colors } from '@/constants/Colors';
 
 interface FileMessageProps {
   message: Message;
@@ -171,14 +172,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   myMessage: {
-    backgroundColor: '#DCF8C6',
+    backgroundColor: Colors.message.sent,
     marginRight: 8,
   },
   otherMessage: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.message.received,
     marginLeft: 8,
     elevation: 1,
-    shadowColor: '#000',
+    shadowColor: Colors.ui.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#25D366',
+    color: Colors.primary.main,
     marginBottom: 4,
   },
   fileContainer: {
@@ -206,12 +207,12 @@ const styles = StyleSheet.create({
   fileName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000000',
+    color: Colors.text.primary,
     marginBottom: 2,
   },
   fileSize: {
     fontSize: 12,
-    color: '#666666',
+    color: Colors.text.secondary,
   },
   downloadButton: {
     padding: 8,
@@ -222,10 +223,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   myCaptionText: {
-    color: '#000000',
+    color: Colors.text.primary,
   },
   otherCaptionText: {
-    color: '#000000',
+    color: Colors.text.primary,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -238,10 +239,10 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   myTimestamp: {
-    color: '#666666',
+    color: Colors.text.tertiary,
   },
   otherTimestamp: {
-    color: '#999999',
+    color: Colors.text.muted,
   },
   tail: {
     position: 'absolute',
@@ -252,14 +253,14 @@ const styles = StyleSheet.create({
   myTail: {
     right: 0,
     borderLeftWidth: 8,
-    borderLeftColor: '#DCF8C6',
+    borderLeftColor: Colors.message.sent,
     borderBottomWidth: 8,
     borderBottomColor: 'transparent',
   },
   otherTail: {
     left: 0,
     borderRightWidth: 8,
-    borderRightColor: '#FFFFFF',
+    borderRightColor: Colors.message.received,
     borderBottomWidth: 8,
     borderBottomColor: 'transparent',
   },
