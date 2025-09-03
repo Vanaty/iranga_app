@@ -36,13 +36,19 @@ export function useMessages(chatId: number) {
       const response = await chatAPI.getChatMessages(chatId);
       const serverMessages = response.content.reverse();
       
-      // Vérifier s'il y a de nouveaux messages
+      // Ne stocker que les messages reçus (pas ceux envoyés par l'utilisateur actuel)
+      const currentUser = await StorageService.getUser();
+      const messagesToStore = serverMessages.filter(msg => 
+        msg.sender.id !== currentUser?.id
+      );
+
+      // Vérifier s'il y a de nouveaux messages reçus
       const localMessages = await StorageService.getMessages(chatId);
-      const newMessages = serverMessages.filter(
+      const newMessages = messagesToStore.filter(
         serverMsg => !localMessages.some(localMsg => localMsg.id === serverMsg.id)
       );
 
-      // Afficher notification pour les nouveaux messages
+      // Afficher notification pour les nouveaux messages reçus uniquement
       if (newMessages.length > 0) {
         const lastMessage = newMessages[newMessages.length - 1];
         await NotificationService.scheduleLocalNotification(
@@ -52,16 +58,26 @@ export function useMessages(chatId: number) {
         );
       }
 
-      setMessages(serverMessages);
-      await StorageService.saveMessages(chatId, serverMessages);
+      setMessages(serverMessages); // Afficher tous les messages
+      await StorageService.saveMessages(chatId, messagesToStore); // Stocker uniquement les messages reçus
     } catch (error) {
       console.error('Erreur lors de la synchronisation des messages:', error);
     }
   };
 
   const addMessage = async (message: Message) => {
+    console.log('Ajout de message via hook:', message);
     setMessages(prev => [message, ...prev]);
-    await StorageService.addMessage(chatId, message);
+    
+    // Mettre à jour le dernier message
+    await StorageService.updateChatLastMessage(chatId, message);
+    
+    // Ne stocker que si le message ne vient pas de l'utilisateur actuel
+    const currentUser = await StorageService.getUser();
+    if (message.sender.id !== currentUser?.id) {
+      await StorageService.addMessage(chatId, message);
+      console.log('Message stocké dans le hook');
+    }
   };
 
   return {

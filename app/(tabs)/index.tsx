@@ -1,53 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Chat } from '@/types/chat';
-import { apiService, chatAPI } from '@/services/api';
-import { StorageService } from '@/services/storage';
+import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChat } from '@/contexts/ChatContext';
+import { StorageService } from '@/services/storage';
+import { Chat } from '@/types/chat';
+import { useRouter } from 'expo-router';
 import { MessageCircle, Plus, Users as UsersIcon } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { GroupChatCreation } from '@/components/GroupChatCreation';
 
 export default function ChatsScreen() {
-  const [chats, setChats] = useState<Chat[]>([]);
+  const { chats,addChat, unreadByChat } = useChat();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastMessages, setLastMessages] = useState<{ [chatId: number]: any }>({});
+  const { isConnected, webSocketService } = useChat();
   const router = useRouter();
   const { user } = useAuth();
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
 
   useEffect(() => {
-    loadChats();
-  }, []);
+    if (!isConnected || !webSocketService) return;
+    loadLastMessages();
+  }, [chats]);
 
-  const loadChats = async () => {
-    try {
-      // Charger depuis le stockage local d'abord
-      const localChats = await StorageService.getChats();
-      if (localChats.length > 0) {
-        setChats(localChats);
-      }
-
-      // Puis synchroniser avec le serveur
-      const response = await chatAPI.getUserChats();
-      setChats(response.content);
-      await StorageService.saveChats(response.content);
-    } catch (error) {
-      console.error('Erreur lors du chargement des chats:', error);
-    } finally {
-      setIsLoading(false);
+  const loadLastMessages = async () => {
+    const lastMessagesData: { [chatId: number]: any } = {};
+    for (const chat of chats) {
+      const lastMessage = await StorageService.getChatLastMessage(chat.id);
+      lastMessagesData[chat.id] = lastMessage;
     }
+    setLastMessages(lastMessagesData);
+    setIsLoading(false);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadChats();
     setRefreshing(false);
   };
 
@@ -65,13 +61,14 @@ export default function ChatsScreen() {
       return chat.chatName || 'Chat de groupe';
     }
     const otherUser = getOtherParticipant(chat);
-    return otherUser ? `${otherUser.firstName} ${otherUser.lastName}` : 'Utilisateur inconnu';
+    return otherUser ? `${otherUser.firstName}` : 'Utilisateur inconnu';
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => {
     const displayName = getChatDisplayName(item);
     const otherUser = getOtherParticipant(item);
-    const unreadCount = 0; // TODO: Implement unread message count
+    const unreadCount = unreadByChat[item.id] || 0;
+    const lastMessage = lastMessages[item.id];
 
     return (
       <TouchableOpacity
@@ -81,7 +78,7 @@ export default function ChatsScreen() {
         <View style={styles.avatarContainer}>
           {item.isGroupChat ? (
             <View style={styles.groupAvatar}>
-              <UsersIcon size={24} color="#3B82F6" />
+              <UsersIcon size={24} color={Colors.primary.main} />
             </View>
           ) : (
             <View style={styles.avatar}>
@@ -100,19 +97,67 @@ export default function ChatsScreen() {
         </View>
         <View style={styles.chatInfo}>
           <Text style={styles.chatName}>{displayName}</Text>
-          <Text style={styles.chatPreview}>
-            {item.isGroupChat ? `${item.participants.length} participants` : '@' + otherUser?.username}
+          <Text style={[
+            styles.chatPreview,
+            unreadCount > 0 && styles.unreadPreview
+          ]}>
+            {lastMessage
+              ? lastMessage.content.length > 50
+                ? `${lastMessage.content.substring(0, 50)}...`
+                : lastMessage.content
+              : item.isGroupChat
+                ? `${item.participants.length} participants`
+                : '@' + otherUser?.role?.libelle
+            }
           </Text>
         </View>
         <View style={styles.chatMeta}>
           <Text style={styles.timestamp}>
-            {new Date(item.createdAt).toLocaleDateString('fr-FR', {
-              day: '2-digit',
-              month: '2-digit',
-            })}
+            {lastMessage
+              ? new Date(lastMessage.timestamp).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+              })
+              : new Date(item.createdAt).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+              })
+            }
           </Text>
+          {unreadCount > 0 && (
+            <View style={styles.unreadIndicator} />
+          )}
         </View>
       </TouchableOpacity>
+    );
+  };
+
+  const handleGroupCreated = (chat: Chat) => {
+    addChat(chat);
+    // Naviguer vers le nouveau chat de groupe
+    router.push(`/chat/${chat.id}`);
+    // Recharger la liste des chats
+    onRefresh();
+  };
+
+  const showCreateOptions = () => {
+    Alert.alert(
+      'Nouveau chat',
+      'Choisissez le type de conversation',
+      [
+        {
+          text: 'Chat privé',
+          onPress: () => router.push('/(tabs)/users'),
+        },
+        {
+          text: 'Groupe',
+          onPress: () => setShowGroupCreation(true),
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+      ]
     );
   };
 
@@ -131,7 +176,7 @@ export default function ChatsScreen() {
         <Text style={styles.headerTitle}>Discussions</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => Alert.alert('Nouveau chat', 'Fonctionnalité à venir')}
+          onPress={showCreateOptions}
         >
           <Plus size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -156,6 +201,12 @@ export default function ChatsScreen() {
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <GroupChatCreation
+        visible={showGroupCreation}
+        onClose={() => setShowGroupCreation(false)}
+        onGroupCreated={handleGroupCreated}
+      />
     </View>
   );
 }
@@ -163,132 +214,167 @@ export default function ChatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 10,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
+    backgroundColor: Colors.primary.main,
+    elevation: 8,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 26,
+    fontWeight: '600',
+    color: Colors.text.white,
+    letterSpacing: 0.5,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 20,
+    backgroundColor: Colors.primary.accent,
+    borderRadius: 25,
     width: 40,
     height: 40,
+    margin: 5,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   listContainer: {
-    padding: 16,
+    padding: 20,
+    paddingTop: 25,
   },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    backgroundColor: Colors.background.card,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary.light,
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 16,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3B82F6',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary.main,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    color: Colors.text.white,
+    fontSize: 20,
+    fontWeight: '700',
   },
   chatInfo: {
     flex: 1,
   },
   chatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 4,
+    letterSpacing: 0.3,
   },
   chatPreview: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 15,
+    color: Colors.text.secondary,
+    fontWeight: '500',
   },
   chatMeta: {
     alignItems: 'flex-end',
   },
   timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: Colors.text.muted,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    backgroundColor: Colors.background.primary,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.secondary,
+    marginTop: 20,
     marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
     textAlign: 'center',
   },
-  groupAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  emptySubtext: {
+    fontSize: 16,
+    color: Colors.text.tertiary,
+    textAlign: 'center',
+    lineHeight: 24,
   },
-  unreadBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+  groupAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.background.input,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: Colors.primary.light,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.status.error,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: Colors.background.card,
   },
   unreadText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
+    color: Colors.text.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  unreadPreview: {
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  unreadIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary.main,
+    marginTop: 4,
   },
 });

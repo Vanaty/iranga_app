@@ -1,8 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LoginRequest, RegisterRequest, User, Chat, Message, AuthResponse, FileResponse, Publication, CreatePublicationRequest, Comment, CreateCommentRequest } from '@/types/chat';
+import { Config } from '@/config/Config';
 
-const API_BASE_URL = 'http://192.168.1.109:8080/api';
+const API_BASE_URL = Config.API_BASE_URL;
+console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -55,7 +57,7 @@ export const userAPI = {
     return response.data;
   },
 
-  getAllUsers: async (): Promise<string[]> => {
+  getAllUsers: async (): Promise<User[]> => {
     const response = await api.get('/users');
     return response.data;
   },
@@ -64,10 +66,18 @@ export const userAPI = {
     const response = await api.get('/users/online');
     return response.data;
   },
+  updateExpoToken: async (token: string): Promise<void> => {
+    await api.post('/users/expo/token', { token });
+  }
 };
 
 // Chat Management
 export const chatAPI = {
+  getChatById: async (id: number): Promise<Chat> => {
+    const response = await api.get(`/chats/${id}`);
+    return response.data;
+  },
+
   getUserChats: async (page = 0, size = 20): Promise<{ content: Chat[]; totalPages: number; totalElements: number }> => {
     const response = await api.get(`/chats?page=${page}&size=${size}`);
     return response.data;
@@ -123,7 +133,7 @@ export const publicationAPI = {
   },
 
   unlikePublication: async (id: number): Promise<void> => {
-    await api.delete(`/publications/${id}/unlike`);
+    await api.delete(`/publications/${id}/like`);
   },
 
   getPublicationComments: async (id: number, page = 0, size = 20): Promise<{ content: Comment[]; totalPages: number; totalElements: number }> => {

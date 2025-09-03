@@ -3,6 +3,7 @@ import { User } from '@/types/chat';
 import { authAPI, userAPI } from '@/services/api';
 import { StorageService } from '@/services/storage';
 import { NotificationService } from '@/services/notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthContextType {
   user: User | null;
@@ -21,36 +22,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuthStatus();
-    try {
-      setupNotifications();
-    } catch (error) {
-      console.error('Erreur lors de la configuration des notifications:', error);
-    }
+    setupNotifications();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
-      const storedUser = await StorageService.getUser();
-      console.log('Utilisateur stocké trouvé:', storedUser);
-      if (storedUser) {
+      // Vérifier d'abord s'il y a un token stocké
+      const token = await AsyncStorage.getItem('authToken');
+      console.log('Token trouvé:', !!token);
+      
+      if (token) {
         try {
+          // Essayer de récupérer les informations utilisateur avec le token
           const userData = await userAPI.getCurrentUser();
+          console.log('Données utilisateur récupérées:', userData);
           setUser(userData);
           await StorageService.saveUser(userData);
         } catch (error) {
-          console.error('Error fetching current user:', error);
+          console.error('Token invalide ou expiré:', error);
+          // Token invalide, nettoyer le stockage
+          await AsyncStorage.removeItem('authToken');
+          await StorageService.clearAll();
+          setUser(null);
+        }
+      } else {
+        // Pas de token, vérifier s'il y a des données utilisateur stockées localement
+        const storedUser = await StorageService.getUser();
+        if (storedUser) {
+          console.log('Utilisateur stocké trouvé mais pas de token, nettoyage...');
           await StorageService.clearAll();
         }
+        setUser(null);
       }
     } catch (error) {
       console.error('Erreur lors de la vérification du statut d\'authentification:', error);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const setupNotifications = async () => {
-    await NotificationService.registerForPushNotificationsAsync();
+    try {
+      const token = await NotificationService.registerForPushNotificationsAsync();
+      
+      // Si un token est obtenu et que l'utilisateur est connecté, l'envoyer au backend
+      if (token && user) {
+        await saveNotificationToken(token);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la configuration des notifications:', error);
+    }
+  };
+
+  const saveNotificationToken = async (token: string) => {
+    try {
+      await userAPI.updateExpoToken(token);
+      console.log('Token de notification sauvegardé sur le backend');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du token de notification:', error);
+    }
   };
 
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -58,9 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const response = await authAPI.login({ username, password });
       
+      console.log('Réponse de connexion:', response);
       setUser(response.user);
       await StorageService.saveUser(response.user);
-      console.log('Utilisateur connecté:', response.user);
+      
+      // Vérifier que le token a bien été sauvegardé
+      const savedToken = await AsyncStorage.getItem('authToken');
+      console.log('Token sauvegardé après connexion:', !!savedToken);
+      
+      // Configurer et envoyer le token de notification
+      try {
+        const notificationToken = await NotificationService.registerForPushNotificationsAsync();
+        if (notificationToken) {
+          await saveNotificationToken(notificationToken);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la configuration des notifications après connexion:', error);
+      }
+      
       return true;
     } catch (error) {
       console.error('Erreur de connexion:', error);
@@ -77,6 +123,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(response.user);
       await StorageService.saveUser(response.user);
+      
+      // Vérifier que le token a bien été sauvegardé
+      const savedToken = await AsyncStorage.getItem('authToken');
+      console.log('Token sauvegardé après inscription:', !!savedToken);
+      
+      // Configurer et envoyer le token de notification
+      try {
+        const notificationToken = await NotificationService.registerForPushNotificationsAsync();
+        if (notificationToken) {
+          await saveNotificationToken(notificationToken);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la configuration des notifications après inscription:', error);
+      }
+      
       return true;
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
@@ -89,10 +150,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async (): Promise<void> => {
     try {
       await authAPI.logout();
+    } catch (error) {
+      console.error('Erreur API de déconnexion:', error);
+      // Continuer même si l'API échoue
+    } finally {
+      // Nettoyer localement dans tous les cas
+      await AsyncStorage.removeItem('authToken');
       await StorageService.clearAll();
       setUser(null);
-    } catch (error) {
-      console.error('Erreur de déconnexion:', error);
+      console.log('Déconnexion locale réussie, utilisateur:', null);
     }
   };
 

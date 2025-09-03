@@ -11,9 +11,11 @@ import {
 import { useRouter } from 'expo-router';
 import { userAPI, chatAPI } from '@/services/api';
 import { Users, UserPlus, Circle } from 'lucide-react-native';
+import { Colors } from '@/constants/Colors';
+import { User } from '@/types/chat';
 
 export default function UsersScreen() {
-  const [allUsers, setAllUsers] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,18 +56,18 @@ export default function UsersScreen() {
     }
   };
 
-  const renderUserItem = ({ item }: { item: string }) => {
-    const isOnline = onlineUsers.includes(item);
+  const renderUserItem = ({ item }: { item: User }) => {
+    const isOnline = onlineUsers.includes(item.username);
 
     return (
       <TouchableOpacity
         style={styles.userItem}
-        onPress={() => startPrivateChat(item)}
+        onPress={() => startPrivateChat(item.username)}
       >
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {item.charAt(0).toUpperCase()}
+              {item.firstName.charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={[
@@ -74,7 +76,7 @@ export default function UsersScreen() {
           ]} />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.username}>@{item}</Text>
+          <Text style={styles.username}>{item.firstName}</Text>
           <Text style={styles.status}>
             {isOnline ? 'En ligne' : 'Hors ligne'}
           </Text>
@@ -112,7 +114,7 @@ export default function UsersScreen() {
         <FlatList
           data={allUsers}
           renderItem={renderUserItem}
-          keyExtractor={(item) => item}
+          keyExtractor={(item) => item.username}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -126,103 +128,114 @@ export default function UsersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 10,
+    backgroundColor: Colors.primary.main,
+    elevation: 8,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 26,
+    fontWeight: '600',
+    color: Colors.text.white,
+    letterSpacing: 0.5,
   },
   onlineCount: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
   },
   onlineCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text.white,
+    marginLeft: 6,
   },
   listContainer: {
-    padding: 16,
+    padding: 20,
+    paddingTop: 25,
   },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    backgroundColor: Colors.background.card,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary.light,
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: 16,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3B82F6',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary.main,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.ui.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    color: Colors.text.white,
+    fontSize: 20,
+    fontWeight: '700',
   },
   statusIndicator: {
     position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     bottom: 2,
     right: 2,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: Colors.background.card,
+    elevation: 2,
   },
   onlineIndicator: {
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.status.online,
   },
   offlineIndicator: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: Colors.status.offline,
   },
   userInfo: {
     flex: 1,
   },
   username: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 4,
+    letterSpacing: 0.3,
   },
   status: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 15,
+    color: Colors.text.secondary,
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
@@ -231,10 +244,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.secondary,
+    marginTop: 20,
     textAlign: 'center',
   },
 });
