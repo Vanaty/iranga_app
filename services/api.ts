@@ -183,6 +183,14 @@ export const fileAPI = {
   },
 };
 
+// WebRTC Management
+export const webrtcAPI = {
+  getConfig: async (): Promise<any> => {
+    const response = await api.get('/webrtc/config');
+    return response.data;
+  },
+};
+
 // Legacy compatibility - keeping the old apiService for existing code
 class ApiService {
   async login(credentials: LoginRequest) {
@@ -271,6 +279,10 @@ class ApiService {
 
   async uploadFile(formData: FormData) {
     return fileAPI.uploadFile(formData);
+  }
+
+  async getWebRTCConfig() {
+    return webrtcAPI.getConfig();
   }
 }
 

@@ -18,7 +18,11 @@ export class WebSocketService {
     private onMessageRead?: (chatId: number, messageId: number) => void,
     private onNewPublication?: (publication: Publication) => void,
     private onPublicationUpdate?: (publication: Publication) => void,
-    private onNewComment?: (comment: Comment) => void
+    private onNewComment?: (comment: Comment) => void,
+    public onCallOffer?: (callData: any) => void,
+    public onCallAnswer?: (callData: any) => void,
+    public onCallCandidate?: (candidate: any) => void,
+    public onCallEnd?: (callId: string) => void
   ) {}
 
   connect(token: string): Promise<void> {
@@ -69,6 +73,35 @@ export class WebSocketService {
             const comment: Comment = JSON.parse(message.body);
             if (this.onNewComment) {
               this.onNewComment(comment);
+            }
+          });
+
+          // Subscribe to WebRTC signaling
+          this.client?.subscribe('/user/queue/call/offer', (message) => {
+            const callData = JSON.parse(message.body);
+            if (this.onCallOffer) {
+              this.onCallOffer(callData);
+            }
+          });
+
+          this.client?.subscribe('/user/queue/call/answer', (message) => {
+            const callData = JSON.parse(message.body);
+            if (this.onCallAnswer) {
+              this.onCallAnswer(callData);
+            }
+          });
+
+          this.client?.subscribe('/user/queue/call/candidate', (message) => {
+            const candidate = JSON.parse(message.body);
+            if (this.onCallCandidate) {
+              this.onCallCandidate(candidate);
+            }
+          });
+
+          this.client?.subscribe('/user/queue/call/end', (message) => {
+            const { callId } = JSON.parse(message.body);
+            if (this.onCallEnd) {
+              this.onCallEnd(callId);
             }
           });
 
@@ -188,6 +221,50 @@ export class WebSocketService {
     this.client.publish({
       destination: `/app/notifications/${userId}`,
       body: JSON.stringify({ title, body, data }),
+    });
+  }
+
+  sendCallOffer(callData: { callId: string; receiverId: number; type: string; offer: any }): void {
+    if (!this.client || !this.isConnected) {
+      return;
+    }
+
+    this.client.publish({
+      destination: '/app/call/offer',
+      body: JSON.stringify(callData),
+    });
+  }
+
+  sendCallAnswer(callData: { callId: string; answer: any }): void {
+    if (!this.client || !this.isConnected) {
+      return;
+    }
+
+    this.client.publish({
+      destination: '/app/call/answer',
+      body: JSON.stringify(callData),
+    });
+  }
+
+  sendIceCandidate(candidateData: { callId: string; candidate: any }): void {
+    if (!this.client || !this.isConnected) {
+      return;
+    }
+
+    this.client.publish({
+      destination: '/app/call/candidate',
+      body: JSON.stringify(candidateData),
+    });
+  }
+
+  sendCallEnd(callData: { callId: string }): void {
+    if (!this.client || !this.isConnected) {
+      return;
+    }
+
+    this.client.publish({
+      destination: '/app/call/end',
+      body: JSON.stringify(callData),
     });
   }
 

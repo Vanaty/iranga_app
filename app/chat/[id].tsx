@@ -21,6 +21,7 @@ import { FileUploadService } from '@/services/fileUpload';
 import { FileUploadProgress } from '@/components/FileUploadProgress';
 import { Colors } from '@/constants/Colors';
 import TypingIndicator from '@/components/messages/TypingIndicator';
+import { useCall } from '@/contexts/CallContext';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +38,7 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
   const { typingUser, messages: contextMessages, setChatMessages, webSocketService, markMessageAsRead } = useChat();
+  const { startCall } = useCall();
   const chatId = parseInt(id as string, 10);
   const [messages, setMessages] = useState<Message[]>(contextMessages[chatId] || []);
   const [typingUserName, setTypingUserName] = useState<string | null>(null);
@@ -246,6 +248,32 @@ export default function ChatScreen() {
     );
   };
 
+  const handleVoiceCall = async () => {
+    const otherUser = getOtherParticipant();
+    if (otherUser && !chatInfo?.isGroupChat) {
+      try {
+        await startCall(otherUser.id, 'audio');
+      } catch (error) {
+        Alert.alert('Erreur', 'Impossible de démarrer l\'appel audio');
+      }
+    } else {
+      Alert.alert('Information', 'Les appels ne sont pas disponibles pour les chats de groupe');
+    }
+  };
+
+  const handleVideoCall = async () => {
+    const otherUser = getOtherParticipant();
+    if (otherUser && !chatInfo?.isGroupChat) {
+      try {
+        await startCall(otherUser.id, 'video');
+      } catch (error) {
+        Alert.alert('Erreur', 'Impossible de démarrer l\'appel vidéo');
+      }
+    } else {
+      Alert.alert('Information', 'Les appels ne sont pas disponibles pour les chats de groupe');
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -303,11 +331,19 @@ export default function ChatScreen() {
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Phone size={20} color="#FFFFFF" />
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleVoiceCall}
+            disabled={chatInfo?.isGroupChat}
+          >
+            <Phone size={20} color={chatInfo?.isGroupChat ? "#666" : "#FFFFFF"} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Video size={20} color="#FFFFFF" />
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleVideoCall}
+            disabled={chatInfo?.isGroupChat}
+          >
+            <Video size={20} color={chatInfo?.isGroupChat ? "#666" : "#FFFFFF"} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <MoreVertical size={20} color="#FFFFFF" />
