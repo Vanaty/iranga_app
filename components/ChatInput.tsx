@@ -97,11 +97,12 @@ export function ChatInput({
     });
 
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      onSendFile({
-        uri: asset.uri,
-        type: 'image',
-        name: asset.fileName || `image_${Date.now()}.jpg`,
+      result.assets.forEach((asset) => {
+        onSendFile({
+          uri: asset.uri,
+          type: 'image',
+          name: asset.fileName || `image_${Date.now()}.jpg`,
+        });
       });
       setShowAttachmentMenu(false);
     }

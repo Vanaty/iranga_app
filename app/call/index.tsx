@@ -26,6 +26,8 @@ const { width, height } = Dimensions.get('window');
 
 export default function VideoCallScreen() {
   const {
+    isCallActive,
+    callData,
     localStream,
     remoteStream,
     isMuted,
@@ -39,7 +41,13 @@ export default function VideoCallScreen() {
 
   useEffect(() => {
     if (!localStream && !remoteStream) {
+      console.log('No active streams');
       router.back();
+      console.log('Navigated back due to no active streams');
+      return;
+    }
+    if (remoteStream) {
+      console.error('Remote Stream Set');
     }
   }, [localStream, remoteStream]);
 

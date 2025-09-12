@@ -1,5 +1,5 @@
 import { Config } from '@/config/Config';
-import type { InstantMessage, Message, Publication } from '../types/chat';
+import type { InstantMessage, Message, Publication, User } from '../types/chat';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
@@ -12,6 +12,7 @@ export class WebSocketService {
   private reconnectInterval = 10000;
 
   constructor(
+    public user: User,
     private onMessage: (message: Message) => void, 
     private onUserStatusChange: (users: string[]) => void,
     private onTypingStatusChange?: (chatId: number, user: string, isTyping: boolean) => void,
@@ -77,28 +78,28 @@ export class WebSocketService {
           });
 
           // Subscribe to WebRTC signaling
-          this.client?.subscribe('/user/queue/call/offer', (message) => {
+          this.client?.subscribe(`/topic/call/offer/${this.user.id}`, (message) => {
             const callData = JSON.parse(message.body);
             if (this.onCallOffer) {
               this.onCallOffer(callData);
             }
           });
 
-          this.client?.subscribe('/user/queue/call/answer', (message) => {
+          this.client?.subscribe(`/topic/call/answer/${this.user.id}`, (message) => {
             const callData = JSON.parse(message.body);
             if (this.onCallAnswer) {
               this.onCallAnswer(callData);
             }
           });
 
-          this.client?.subscribe('/user/queue/call/candidate', (message) => {
+          this.client?.subscribe(`/topic/call/candidate/${this.user.id}`, (message) => {
             const candidate = JSON.parse(message.body);
             if (this.onCallCandidate) {
               this.onCallCandidate(candidate);
             }
           });
 
-          this.client?.subscribe('/user/queue/call/end', (message) => {
+          this.client?.subscribe(`/topic/call/end/${this.user.id}`, (message) => {
             const { callId } = JSON.parse(message.body);
             if (this.onCallEnd) {
               this.onCallEnd(callId);
@@ -224,7 +225,7 @@ export class WebSocketService {
     });
   }
 
-  sendCallOffer(callData: { callId: string; receiverId: number; type: string; offer: any }): void {
+  sendCallOffer(callData: { callId: string; callerId: number; receiverId: number; type: string; offer: any }): void {
     if (!this.client || !this.isConnected) {
       return;
     }
@@ -235,7 +236,7 @@ export class WebSocketService {
     });
   }
 
-  sendCallAnswer(callData: { callId: string; answer: any }): void {
+  sendCallAnswer(callData: { callId: string; userId: number; answer: any }): void {
     if (!this.client || !this.isConnected) {
       return;
     }
@@ -246,18 +247,17 @@ export class WebSocketService {
     });
   }
 
-  sendIceCandidate(candidateData: { callId: string; candidate: any }): void {
+  sendIceCandidate(candidateData: { callId: string; userId: number; candidate: any }): void {
     if (!this.client || !this.isConnected) {
       return;
     }
-
     this.client.publish({
       destination: '/app/call/candidate',
       body: JSON.stringify(candidateData),
     });
   }
 
-  sendCallEnd(callData: { callId: string }): void {
+  sendCallEnd(callData: { callId: string, userId: number }): void {
     if (!this.client || !this.isConnected) {
       return;
     }

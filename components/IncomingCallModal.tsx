@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,13 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useCall } from '@/contexts/CallContext';
 import { Phone, PhoneOff, Video } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { router } from 'expo-router';
+import RNCallKeep, {IOptions} from 'react-native-callkeep';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +23,64 @@ export function IncomingCallModal() {
     acceptCall, 
     rejectCall 
   } = useCall();
+
+  useEffect(() => {
+    // Configuration pour CallKeep
+    const options: IOptions = {
+      ios: {
+        appName: 'IrangaMg',
+        supportsVideo: true,
+        maximumCallGroups: '1',
+        maximumCallsPerCallGroup: '1',
+      },
+      android: {
+        alertTitle: 'Permissions required',
+        alertDescription: 'Cette application doit accéder au système téléphonique pour fonctionner.',
+        cancelButton: 'Annuler',
+        okButton: 'OK',
+        imageName: 'phone_account_icon',
+        additionalPermissions: [],
+        selfManaged: false,
+      }
+    };
+
+    // Initialiser CallKeep
+    RNCallKeep.setup(options);
+
+    // Écouter les événements CallKeep
+    const answerCall = ({ callUUID }: { callUUID: string }) => {
+      handleAcceptCall();
+    };
+
+    const endCall = ({ callUUID }: { callUUID: string }) => {
+      handleRejectCall();
+    };
+
+    RNCallKeep.addEventListener('answerCall', answerCall);
+    RNCallKeep.addEventListener('endCall', endCall);
+
+    // Nettoyage
+    return () => {
+      RNCallKeep.removeEventListener('answerCall');
+      RNCallKeep.removeEventListener('endCall');
+    };
+  }, []);
+
+  useEffect(() => {
+    // Afficher l'appel entrant natif quand un appel arrive
+    if (isIncomingCall && callData) {
+      const callUUID = callData.callId || 'incoming-call';
+      const callerName = getCallerName();
+      
+      RNCallKeep.displayIncomingCall(
+        callUUID,
+        callerName,
+        callerName,
+        'generic',
+        callData.type === 'video'
+      );
+    }
+  }, [isIncomingCall, callData]);
 
   const handleAcceptCall = async () => {
     await acceptCall();

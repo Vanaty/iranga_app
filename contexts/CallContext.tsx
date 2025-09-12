@@ -5,6 +5,7 @@ import { useChat } from './ChatContext';
 
 interface CallContextType {
   webRTCService: WebRTCService | null;
+  isOutgoingCall: boolean;
   isCallActive: boolean;
   isIncomingCall: boolean;
   callData: CallData | null;
@@ -36,6 +37,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
+  const [isOutgoingCall, setIsOutgoingCall] = useState(false);
 
   useEffect(() => {
     if (webSocketService && user) {
@@ -49,7 +51,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       handleRemoteStream,
       handleCallEnded,
       handleError,
-      webSocketService
+      webSocketService!
     );
 
     setWebRTCService(service);
@@ -58,7 +60,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     webSocketService!.onCallOffer = handleIncomingCall;
     webSocketService!.onCallAnswer = handleCallAnswer;
     webSocketService!.onCallCandidate = handleIceCandidate;
-    webSocketService!.onCallEnd = handleCallEnded;
+    webSocketService!.onCallEnd = onCallEnd;
   };
 
   const handleLocalStream = (stream: any) => {
@@ -70,6 +72,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIsCallConnected(true);
   };
 
+  const onCallEnd = (callId: string) => {
+    endCall();
+  };
+
   const handleCallEnded = () => {
     setIsCallActive(false);
     setIsIncomingCall(false);
@@ -79,6 +85,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setRemoteStream(null);
     setIsMuted(false);
     setIsCameraOff(false);
+    setIsOutgoingCall(false);
+    console.info('Call ended');
   };
 
   const handleError = (error: string) => {
@@ -91,7 +99,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIsIncomingCall(true);
   };
 
-  const handleCallAnswer = async (answerData: any) => {
+  const handleCallAnswer = async (answerData: CallData) => {
     if (webRTCService && answerData.answer) {
       await webRTCService.handleCallAnswer(answerData.answer);
     }
@@ -107,11 +115,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!webRTCService) return;
 
     try {
+      setIsOutgoingCall(true);
       setIsCallActive(true);
+
       await webRTCService.startCall(receiverId, callType);
     } catch (error) {
       console.error('Error starting call:', error);
       setIsCallActive(false);
+      setIsOutgoingCall(false);
     }
   };
 
@@ -166,6 +177,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     <CallContext.Provider
       value={{
         webRTCService,
+        isOutgoingCall,
         isCallActive,
         isIncomingCall,
         callData,

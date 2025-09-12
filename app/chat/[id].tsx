@@ -8,7 +8,7 @@ import {
   Alert,
   StatusBar,
 } from 'react-native';
-import { useLocalSearchParams, Link } from 'expo-router';
+import { useLocalSearchParams, Link, router } from 'expo-router';
 import { Message, MessageType, Chat, InstantMessage } from '@/types/chat';
 import { chatAPI } from '@/services/api';
 import { StorageService } from '@/services/storage';
@@ -145,8 +145,9 @@ export default function ChatScreen() {
   const handleSendFile = async (file: { uri: string; type: string; name: string }) => {
     if (!user || !chatInfo) return;
 
+    // Générer un ID unique pour l'upload
     const uploadId = `upload_${Date.now()}`;
-    
+
     // Ajouter à la liste des uploads
     setUploadingFiles(prev => [...prev, {
       id: uploadId,
@@ -253,6 +254,7 @@ export default function ChatScreen() {
     if (otherUser && !chatInfo?.isGroupChat) {
       try {
         await startCall(otherUser.id, 'audio');
+        router.push('/call');
       } catch (error) {
         Alert.alert('Erreur', 'Impossible de démarrer l\'appel audio');
       }
@@ -266,6 +268,7 @@ export default function ChatScreen() {
     if (otherUser && !chatInfo?.isGroupChat) {
       try {
         await startCall(otherUser.id, 'video');
+        router.push('/call');
       } catch (error) {
         Alert.alert('Erreur', 'Impossible de démarrer l\'appel vidéo');
       }

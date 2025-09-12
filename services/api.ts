@@ -67,7 +67,7 @@ export const userAPI = {
     return response.data;
   },
   updateExpoToken: async (token: string): Promise<void> => {
-    await api.post('/users/expo/token', { token });
+    await api.post('/users/expo/token', { 'token': token });
   }
 };
 

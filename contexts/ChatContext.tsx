@@ -151,6 +151,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
 
       const wsService = new WebSocketService(
+        user,
         handleNewMessage,
         setOnlineUsers,
         handleTypingUser,

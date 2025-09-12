@@ -94,6 +94,16 @@ Une application mobile React Native construite avec Expo pour la messagerie inst
 - **Personnalisation** : Nom de groupe et paramètres avancés
 - **Interface intuitive** : Sélection multiple avec preview des participants
 
+### Appels Audio/Vidéo
+- **WebRTC natif** : Intégration React Native WebRTC pour appels P2P
+- **Configuration STUN/TURN** : Serveurs ICE automatiques du backend
+- **Signaling WebSocket** : Négociation SDP et candidats ICE temps réel
+- **Interface d'appel** : Contrôles audio/vidéo avec overlay moderne
+- **Gestion d'état** : Context dédié pour la session d'appel
+- **Notifications d'appel** : Alertes entrantes et sortantes avec accept/reject
+- **Prévisualisation vidéo** : Affichage du flux local pendant l'attente de réponse
+- **Contrôles en temps réel** : Mute/unmute et caméra on/off pendant l'appel
+
 ## 🛠️ Technologies utilisées
 
 - **React Native** - Framework mobile cross-platform
@@ -104,6 +114,7 @@ Une application mobile React Native construite avec Expo pour la messagerie inst
 - **AsyncStorage** - Stockage local persistant
 - **Lucide React Native** - Icônes SVG légères
 - **WebSocket/STOMP** - Temps réel bidirectionnel
+- **React Native WebRTC** - Communication P2P audio/vidéo
 
 ## 📁 Architecture des Composants
 
@@ -116,7 +127,9 @@ components/
 ├── MessageBubble.tsx        # Router principal de messages
 ├── ChatInput.tsx            # Zone de saisie adaptative
 ├── MessageStatus.tsx        # Statuts de lecture (coches)
-└── PublicationCard.tsx      # Cartes de publications
+├── PublicationCard.tsx      # Cartes de publications
+├── IncomingCallModal.tsx    # Modal d'appel entrant
+└── OutgoingCallModal.tsx    # Modal d'appel sortant avec prévisualisation
 ```
 
 ## 📱 Structure de l'application
@@ -133,8 +146,65 @@ app/
 │   └── profile.tsx        # Profil utilisateur et déconnexion
 ├── chat/
 │   └── [id].tsx          # Interface de chat complète
+├── call/
+│   └── index.tsx         # Interface d'appel en cours
 └── index.tsx             # Point d'entrée avec redirection auto
 ```
+
+## 🛠️ Build
+Here's the list with the additional points:
+
+1. Ensure that you have OpenJDK 17, Android Studio, and its associated tools and NDK (Native Development Kit) installed on your system.
+
+2. Initialize a new Expo project by executing the following command in your terminal: `pnpm create expo-app@latest`. This command will prompt you to provide some details about your project, such as the project name and configuration options.
+
+3. Before building the Android app, you need to prebuild the `android` directory. Run the command `pnpm expo prebuild` to generate the necessary files. Additionally, you should provide your app's package name during this step. For example, if your app's package name is `com.example.app`.
+
+4. Generate a keystore file. Use an administrator shell to create the keystore. Run the following command: `keytool -genkeypair -v -storetype PKCS12 -keystore my-upload-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000` and enter your password (store it safely somewhere) and details.
+
+5. Add this keystore file in your `android/app` folder.
+
+6. Add the following details in your `android/gradle.properties` file:
+```
+MYAPP_UPLOAD_STORE_FILE=my-upload-key.keystore
+MYAPP_UPLOAD_KEY_ALIAS=my-key-alias
+MYAPP_UPLOAD_STORE_PASSWORD=*****
+MYAPP_UPLOAD_KEY_PASSWORD=*****
+```
+
+7. Now, go to the `android/app/build.gradle` file and make the changes for the release:
+```
+signingConfigs {
+    release {
+        if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+            storeFile file(MYAPP_UPLOAD_STORE_FILE)
+            storePassword MYAPP_UPLOAD_STORE_PASSWORD
+            keyAlias MYAPP_UPLOAD_KEY_ALIAS
+            keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+        }
+    }
+}
+buildTypes {
+    release {
+        ...
+        signingConfig signingConfigs.release
+    }
+}
+```
+8. Create `local.properties` dans `android`
+```bash
+sdk.dir=C:\Android\Sdk
+```
+9.  Build the APK:
+    Navigate to the `android` directory and run the Gradle command to build the release APK.
+    ```bash
+    cd android
+    ./gradlew assembleRelease
+    # On Windows, use:
+    # gradlew.bat assembleRelease
+    ```
+    The signed APK will be located at `android/app/build/outputs/apk/release/app-release.apk`.
+
 
 ## 🌐 API Backend
 
@@ -163,6 +233,241 @@ L'application se connecte à une API REST à `http://localhost:8080/api` :
 - `DELETE /publications/{id}` - Supprimer publication
 - `POST /publications/{id}/like` - Aimer une publication
 - `DELETE /publications/{id}/unlike` - Retirer le like
+
+### WebRTC & Appels
+- `GET /webrtc/config` - Configuration STUN/TURN servers avec credentials
+- WebSocket `/ws` - Signaling pour négociation SDP et ICE candidates
+
+## 📞 Architecture WebRTC Backend
+
+### Configuration WebRTC
+Le backend fournit une configuration WebRTC dynamique via `GET /webrtc/config` :
+
+```json
+{
+  "iceServers": [
+    {
+      "urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
+      "username": null,
+      "credential": null
+    },
+    {
+      "urls": ["turn:your-turn-server.com:3478"],
+      "username": "generated-username",
+      "credential": "generated-password",
+      "credentialType": "password"
+    }
+  ],
+  "timestamp": 1703123456789,
+  "ttl": 3600
+}
+```
+
+**Fonctionnalités de Configuration :**
+- **STUN Servers** : Google STUN publics pour NAT traversal
+- **TURN Servers** : Serveurs relais privés avec credentials temporaires
+- **TTL dynamique** : Credentials régénérés automatiquement
+- **Load balancing** : Rotation automatique des serveurs disponibles
+- **Fallback** : Configuration par défaut si serveurs indisponibles
+
+### Signaling WebSocket
+
+Le backend gère le signaling WebRTC via WebSocket avec les actions suivantes :
+
+#### Actions WebSocket pour Appels
+
+**1. Initier un Appel**
+```javascript
+// Client → Serveur
+{
+  "action": "CALL_OFFER",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "receiverId": 123,
+    "callerId": 321,
+    "type": "video", // ou "audio"
+    "offer": {
+      "sdp": "v=0\r\no=...",
+      "type": "offer"
+    }
+  }
+}
+
+// Serveur → Récepteur
+{
+  "type": "CALL_INCOMING",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "callerId": 456,
+    "callerName": "John Doe",
+    "type": "video",
+    "offer": { ... }
+  }
+}
+```
+
+**2. Accepter un Appel**
+```javascript
+// Récepteur → Serveur
+{
+  "action": "CALL_ANSWER",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "answer": {
+      "sdp": "v=0\r\no=...",
+      "type": "answer"
+    }
+  }
+}
+
+// Serveur → Appelant
+{
+  "type": "CALL_ANSWERED",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "answer": { ... }
+  }
+}
+```
+
+**3. Échange ICE Candidates**
+```javascript
+// Bidirectionnel
+{
+  "action": "ICE_CANDIDATE",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "userId": 123,
+    "candidate": {
+      "candidate": "candidate:1 1 UDP 2130706431 192.168.1.100 54400 typ host",
+      "sdpMLineIndex": 0,
+      "sdpMid": "0"
+    }
+  }
+}
+```
+
+**4. Terminer un Appel**
+```javascript
+// N'importe quel participant → Serveur
+{
+  "action": "CALL_END",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "reason": "user_hangup" // ou "network_error", "timeout"
+  }
+}
+
+// Serveur → Autres participants
+{
+  "type": "CALL_ENDED",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "reason": "user_hangup",
+    "endedBy": 456
+  }
+}
+```
+
+**5. Rejeter un Appel**
+```javascript
+// Récepteur → Serveur
+{
+  "action": "CALL_REJECT",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "reason": "busy" // ou "declined"
+  }
+}
+
+// Serveur → Appelant
+{
+  "type": "CALL_REJECTED",
+  "payload": {
+    "callId": "call_1703123456_abc123",
+    "reason": "busy"
+  }
+}
+```
+
+### Gestion des Sessions d'Appel
+
+**Backend Call Management :**
+- **Session tracking** : Stockage temporaire des appels actifs en mémoire
+- **Timeout handling** : Auto-terminaison après 60s sans réponse
+- **Cleanup automatique** : Suppression des sessions terminées
+- **Rate limiting** : Maximum 1 appel simultané par utilisateur
+- **Statut utilisateur** : Mise à jour "in_call" pendant l'appel
+
+**Exemple de Session Backend :**
+```java
+@Entity
+public class CallSession {
+    private String callId;
+    private Long callerId;
+    private Long receiverId;
+    private CallType type; // AUDIO, VIDEO
+    private CallStatus status; // INITIATING, RINGING, CONNECTED, ENDED
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
+    private String endReason;
+}
+```
+
+### Architecture de Signaling
+
+**Flow Complet d'un Appel :**
+
+1. **Initiation (Client A)**
+   - `GET /webrtc/config` → Récupère configuration ICE
+   - `WebRTCService.initializeCall()` → Configure PeerConnection
+   - `WebSocket: CALL_OFFER` → Envoie offer au serveur
+
+2. **Routage (Backend)**
+   - Valide l'existence du récepteur
+   - Vérifie la disponibilité (pas déjà en appel)
+   - Crée session d'appel temporaire
+   - Route `CALL_INCOMING` vers Client B
+
+3. **Réponse (Client B)**
+   - Reçoit notification d'appel entrant
+   - `WebRTCService.acceptCall()` → Configure PeerConnection
+   - `WebSocket: CALL_ANSWER` → Envoie answer au serveur
+
+4. **Établissement (Backend)**
+   - Route `CALL_ANSWERED` vers Client A
+   - Commence l'échange ICE candidates
+   - Met à jour statut session → CONNECTED
+
+5. **Communication (P2P)**
+   - Flux audio/vidéo direct entre clients
+   - ICE candidates via signaling server
+   - Heartbeat pour détection déconnexion
+
+6. **Terminaison**
+   - `WebSocket: CALL_END` par n'importe quel client
+   - Backend broadcast `CALL_ENDED`
+   - Cleanup session et ressources
+
+### Optimisations Backend
+
+**Performance :**
+- **Connection pooling** : Réutilisation des connexions TURN
+- **Credentials caching** : Cache Redis des tokens TURN
+- **Geographic routing** : Sélection serveur TURN le plus proche
+- **Load balancing** : Distribution des appels sur plusieurs serveurs
+
+**Sécurité :**
+- **JWT validation** : Vérification token pour chaque action WebSocket
+- **Rate limiting** : Protection contre spam d'appels
+- **Credentials rotation** : Renouvellement automatique des accès TURN
+- **Encryption** : TLS pour signaling, DTLS pour media streams
+
+**Monitoring :**
+- **Call analytics** : Durée, qualité, échecs d'appels
+- **Resource monitoring** : Utilisation serveurs TURN
+- **Error tracking** : Logs détaillés des échecs de connexion
+- **Performance metrics** : Latence, packet loss, bandwidth
 
 ## 📦 Services
 
@@ -199,6 +504,14 @@ L'application se connecte à une API REST à `http://localhost:8080/api` :
 - Gestion des types MIME automatique
 - Compression d'images et optimisation
 - Cache et stockage local des uploads
+
+### CallContext
+- **Gestion des appels** : État global des sessions d'appel
+- **WebRTC Service** : Intégration native React Native WebRTC
+- **Flux vidéo** : Gestion des streams locaux et distants
+- **Contrôles temps réel** : Audio/vidéo toggle et basculement caméra
+- **Signaling** : Coordination WebSocket pour négociation SDP/ICE
+- **Modals d'appel** : Interface entrante et sortante avec prévisualisation
 
 ## 🔒 Sécurité
 

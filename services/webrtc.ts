@@ -1,5 +1,6 @@
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices } from 'react-native-webrtc';
 import { apiService } from './api';
+import { WebSocketService } from './websocket';
 
 export interface WebRTCConfig {
   iceServers: Array<{
@@ -34,7 +35,7 @@ export class WebRTCService {
     private onRemoteStream: (stream: any) => void,
     private onCallEnded: () => void,
     private onError: (error: string) => void,
-    private webSocketService: any
+    private webSocketService: WebSocketService
   ) {}
 
   async getWebRTCConfig(): Promise<WebRTCConfig> {
@@ -111,6 +112,7 @@ export class WebRTCService {
       // Send call offer via WebSocket
       this.webSocketService.sendCallOffer({
         callId: this.callId,
+        callerId: this.webSocketService.user.id,
         receiverId,
         type: callType,
         offer,
@@ -137,6 +139,7 @@ export class WebRTCService {
         // Send answer via WebSocket
         this.webSocketService.sendCallAnswer({
           callId: this.callId,
+          userId: this.webSocketService.user.id,
           answer,
         });
       }
@@ -166,7 +169,7 @@ export class WebRTCService {
   async endCall(): Promise<void> {
     try {
       if (this.callId) {
-        this.webSocketService.sendCallEnd({ callId: this.callId });
+        this.webSocketService.sendCallEnd({ callId: this.callId, userId: this.webSocketService.user.id });
       }
       
       this.cleanup();
@@ -214,6 +217,7 @@ export class WebRTCService {
       if (event.candidate && this.callId) {
         this.webSocketService.sendIceCandidate({
           callId: this.callId,
+          userId: this.webSocketService.user.id,
           candidate: event.candidate,
         });
       }

@@ -140,4 +140,9 @@ dist
 
 expo-env.d.ts
 .expo
+*-firebase-adminsdk-*.json
+# android/gradele.properties
+# android/app/my-release-key.keystore
+# android/.gradle
+android
 # @end expo-cli

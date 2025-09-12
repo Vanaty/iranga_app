@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { use, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Mail, Phone, LogOut, Settings } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -26,12 +27,21 @@ export default function ProfileScreen() {
           onPress: async () => {
             console.info('Début de la déconnexion...');
             await logout();
+            
+            // Exiter l'application ou naviguer vers l'écran de connexion
+            router.replace('/(auth)/login');
             console.info('Déconnexion terminée');
           },
         },
       ]
     );
   };
+
+  useEffect(() => {
+    if (!user) {
+      router.replace("/(auth)/login");
+    }
+  }, [user]);
 
   if (!user) {
     return (
