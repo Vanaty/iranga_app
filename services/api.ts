@@ -1,9 +1,9 @@
-import axios from 'axios';
+import type { AuthResponse, Chat, Comment, CreateCommentRequest, CreatePublicationRequest, FileResponse, LoginRequest, Message, Publication, RegisterRequest, User } from '@/types/chat';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { LoginRequest, RegisterRequest, User, Chat, Message, AuthResponse, FileResponse, Publication, CreatePublicationRequest, Comment, CreateCommentRequest } from '@/types/chat';
-import { Config } from '@/config/Config';
+import axios from 'axios';
 
-const API_BASE_URL = Config.API_BASE_URL;
+// const API_BASE_URL = Config.API_BASE_URL;
+const API_BASE_URL = 'http://192.168.68.53:8080/api'; // Remplacez par l'URL de votre API locale pour le développement
 console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({

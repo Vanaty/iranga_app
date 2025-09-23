@@ -15,13 +15,12 @@ import {
 import { Publication, CreatePublicationRequest } from '@/types/chat';
 import { PublicationCard } from '@/components/PublicationCard';
 import { useChat } from '@/contexts/ChatContext';
-import { apiService, publicationAPI } from '@/services/api';
+import { publicationAPI } from '@/services/api';
 import { Plus, X, Send } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 
 export default function PublicationsScreen() {
   const { publications, refreshPublications, addPublication, updatePublication } = useChat();
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPublication, setNewPublication] = useState<CreatePublicationRequest>({
@@ -29,20 +28,6 @@ export default function PublicationsScreen() {
     content: '',
   });
   const [isCreating, setIsCreating] = useState(false);
-
-  useEffect(() => {
-    loadPublications();
-  }, []);
-
-  const loadPublications = async () => {
-    try {
-      await refreshPublications();
-    } catch (error) {
-      console.error('Error loading publications:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -93,14 +78,6 @@ export default function PublicationsScreen() {
       onComment={handleComment}
     />
   );
-
-  if (isLoading) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Chargement des publications...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -211,7 +188,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '500',
     color: Colors.text.white,
     letterSpacing: 0.5,
   },

@@ -1,10 +1,10 @@
-import { Config } from '@/config/Config';
-import type { InstantMessage, Message, Publication, User } from '../types/chat';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import type { InstantMessage, Message, Publication, User } from '../types/chat';
 
 export class WebSocketService {
-  private wsUrl: string = Config.WEBSOCKET_URL;
+  // private wsUrl: string = Config.WEBSOCKET_URL;
+  private wsUrl: string = 'http://192.168.68.53:8080/ws'; // Remplacez par l'URL de votre WebSocket locale pour le développement
   private client: Client | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
@@ -106,6 +106,8 @@ export class WebSocketService {
             }
           });
 
+          this.subscribeToChatEvent(this.user.id);
+
           resolve();
         };
 
@@ -135,13 +137,13 @@ export class WebSocketService {
     });
   }
 
-  subscribeToChat(chatId: number): () => void {
+  subscribeToChatEvent(userId: number): () => void {
     if (!this.client || !this.isConnected) {
       console.warn('Cannot subscribe to chat: WebSocket not connected');
       return () => {};
     }
 
-    const messageSubscription = this.client.subscribe(`/topic/chat/${chatId}`, (message) => {
+    const messageSubscription = this.client.subscribe(`/topic/chat/${userId}`, (message) => {
       try {
         const chatMessage: Message = JSON.parse(message.body);
         console.log("Received chat message:", chatMessage);
@@ -151,22 +153,22 @@ export class WebSocketService {
       }
     });
 
-    const typingSubscription = this.client.subscribe(`/topic/chat/${chatId}/typing`, (message) => {
+    const typingSubscription = this.client.subscribe(`/topic/chat/${userId}/typing`, (message) => {
       try {
         const typingData = JSON.parse(message.body);
         if (this.onTypingStatusChange) {
-          this.onTypingStatusChange(chatId, typingData.username, typingData.typing);
+          this.onTypingStatusChange(typingData.chatId, typingData.username, typingData.typing);
         }
       } catch (error) {
         console.error('Error parsing typing status:', error);
       }
     });
 
-    const readSubscription = this.client.subscribe(`/topic/chat/${chatId}/read`, (message) => {
+    const readSubscription = this.client.subscribe(`/topic/chat/${userId}/read`, (message) => {
       try {
         const readData = JSON.parse(message.body);
         if (this.onMessageRead) {
-          this.onMessageRead(chatId, readData.messageId);
+          this.onMessageRead(readData.chatId, readData.messageId);
         }
       } catch (error) {
         console.error('Error parsing read status:', error);
@@ -199,7 +201,7 @@ export class WebSocketService {
 
     this.client.publish({
       destination: `/app/chat/${chatId}/typing`,
-      body: JSON.stringify({ typing: isTyping }),
+      body: JSON.stringify({ typing: isTyping, chatId }),
     });
   }
 
@@ -210,7 +212,7 @@ export class WebSocketService {
 
     this.client.publish({
       destination: `/app/chat/${chatId}/read`,
-      body: JSON.stringify({ messageId }),
+      body: JSON.stringify({ messageId, chatId }),
     });
   }
 
@@ -225,7 +227,7 @@ export class WebSocketService {
     });
   }
 
-  sendCallOffer(callData: { callId: string; callerId: number; receiverId: number; type: string; offer: any }): void {
+  sendCallOffer(callData: { callId: string; callerId: number; callerName: string; receiverId: number; type: string; offer: any }): void {
     if (!this.client || !this.isConnected) {
       return;
     }

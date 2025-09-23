@@ -6,9 +6,13 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Mail, Phone, LogOut, Settings } from 'lucide-react-native';
+import { User, Mail, Phone, LogOut, Settings, Edit3, Bell, Shield } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ModernCard } from '@/components/ModernCard';
+import { ModernButton } from '@/components/ModernButton';
 import { Colors } from '@/constants/Colors';
 import { router } from 'expo-router';
 
@@ -51,62 +55,110 @@ export default function ProfileScreen() {
     );
   }
 
+  const { width } = Dimensions.get('window');
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header avec dégradé */}
+      <LinearGradient
+        colors={Colors.primary.gradient as [string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <ModernCard variant="glass" padding="large" borderRadius="xl" style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+            </Text>
+          </ModernCard>
+          <Text style={styles.name}>
+            {user.firstName} {user.lastName}
           </Text>
+          <Text style={styles.username}>@{user.username}</Text>
+          <ModernButton
+            title="Modifier le profil"
+            onPress={() => {}}
+            variant="ghost"
+            size="small"
+            icon={<Edit3 size={16} color={Colors.text.white} style={{ marginRight: 8 }} />}
+            style={styles.editButton}
+          />
         </View>
-        <Text style={styles.name}>
-          {user.firstName} {user.lastName}
-        </Text>
-        <Text style={styles.username}>@{user.username}</Text>
-      </View>
+      </LinearGradient>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Informations</Text>
-        
-        <View style={styles.infoItem}>
-          <Mail size={20} color="#6B7280" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>{user.email}</Text>
-          </View>
-        </View>
-
-        {user.phoneNumber && (
+      <View style={styles.content}>
+        {/* Informations personnelles */}
+        <ModernCard variant="elevated" padding="large" borderRadius="xl" style={styles.section}>
+          <Text style={styles.sectionTitle}>Informations personnelles</Text>
+          
           <View style={styles.infoItem}>
-            <Phone size={20} color="#6B7280" />
+            <View style={styles.infoIcon}>
+              <Mail size={20} color={Colors.primary.main} />
+            </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Téléphone</Text>
-              <Text style={styles.infoValue}>{user.phoneNumber}</Text>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoValue}>{user.email}</Text>
             </View>
           </View>
-        )}
 
-        <View style={styles.infoItem}>
-          <User size={20} color="#6B7280" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Rôle</Text>
-            <Text style={styles.infoValue}>{user.role?.libelle || 'Non défini'}</Text>
+          {user.phoneNumber && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Phone size={20} color={Colors.primary.main} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Téléphone</Text>
+                <Text style={styles.infoValue}>{user.phoneNumber}</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <User size={20} color={Colors.primary.main} />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Rôle</Text>
+              <Text style={styles.infoValue}>{user.role?.libelle || 'Non défini'}</Text>
+            </View>
           </View>
-        </View>
-      </View>
+        </ModernCard>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Actions</Text>
-        
-        <TouchableOpacity style={styles.actionItem}>
-          <Settings size={20} color="#6B7280" />
-          <Text style={styles.actionText}>Paramètres</Text>
-        </TouchableOpacity>
+        {/* Actions */}
+        <ModernCard variant="elevated" padding="large" borderRadius="xl" style={styles.section}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={styles.actionIcon}>
+              <Settings size={20} color={Colors.primary.main} />
+            </View>
+            <Text style={styles.actionText}>Paramètres</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionItem, styles.logoutItem]} onPress={handleLogout}>
-          <LogOut size={20} color="#EF4444" />
-          <Text style={[styles.actionText, styles.logoutText]}>Déconnexion</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={styles.actionIcon}>
+              <Bell size={20} color={Colors.primary.main} />
+            </View>
+            <Text style={styles.actionText}>Notifications</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={styles.actionIcon}>
+              <Shield size={20} color={Colors.primary.main} />
+            </View>
+            <Text style={styles.actionText}>Confidentialité</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={[styles.actionItem, styles.logoutItem]} onPress={handleLogout}>
+            <View style={[styles.actionIcon, styles.logoutIcon]}>
+              <LogOut size={20} color={Colors.status.error} />
+            </View>
+            <Text style={[styles.actionText, styles.logoutText]}>Déconnexion</Text>
+          </TouchableOpacity>
+        </ModernCard>
       </View>
     </ScrollView>
   );
@@ -115,71 +167,82 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary,
   },
   header: {
-    alignItems: 'center',
     paddingTop: 60,
-    paddingBottom: 32,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 40,
+    paddingHorizontal: 20,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.primary.dark,
-    justifyContent: 'center',
+  headerContent: {
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  avatarContainer: {
+    marginBottom: 20,
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '600',
+    color: Colors.primary.main,
+    fontSize: 32,
+    fontWeight: '700',
   },
   name: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.text.white,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   username: {
     fontSize: 16,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  editButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  content: {
+    padding: 20,
+    paddingTop: 20,
   },
   section: {
-    backgroundColor: Colors.background.card,
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 20,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.ui.border,
+    borderBottomColor: Colors.ui.divider,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   infoContent: {
-    marginLeft: 12,
     flex: 1,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
+    color: Colors.text.secondary,
+    marginBottom: 4,
+    fontWeight: '600',
   },
   infoValue: {
     fontSize: 16,
-    color: '#1F2937',
+    color: Colors.text.primary,
     fontWeight: '500',
   },
   actionItem: {
@@ -187,18 +250,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: Colors.ui.divider,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   actionText: {
     fontSize: 16,
-    color: '#1F2937',
-    marginLeft: 12,
+    color: Colors.text.primary,
     fontWeight: '500',
   },
   logoutItem: {
     borderBottomWidth: 0,
   },
+  logoutIcon: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
   logoutText: {
-    color: '#EF4444',
+    color: Colors.status.error,
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.ui.divider,
+    marginVertical: 8,
   },
 });

@@ -1,55 +1,72 @@
 export const Colors = {
-  // Palette principale inspirée WhatsApp avec touches modernes
+  // Palette principale moderne avec dégradés
   primary: {
-    main: '#128C7E',      // Vert WhatsApp principal
-    dark: '#128C7E',      // Vert foncé pour headers
-    light: '#DCF8C6',     // Vert clair pour messages envoyés
-    accent: '#1aaa8bff',    // Vert accent moderne
+    main: '#6366F1',      // Indigo moderne
+    dark: '#4F46E5',      // Indigo foncé
+    light: '#A5B4FC',     // Indigo clair
+    accent: '#8B5CF6',    // Violet accent
+    gradient: ['#6366F1', '#8B5CF6'], // Dégradé principal
   },
   
-  // Couleurs de fond chaleureuses
+  // Couleurs de fond modernes avec glassmorphism
   background: {
-    primary: '#F7F3F0',   // Beige très clair
-    secondary: '#ECE5DD', // Beige WhatsApp
-    card: '#FFFFFF',      // Blanc pour les cartes
-    chat: '#E8DDD4',      // Fond chat plus chaleureux
-    input: '#F5F1ED',     // Fond zone de saisie
+    primary: '#FAFAFA',   // Blanc cassé moderne
+    secondary: '#F8FAFC', // Gris très clair
+    card: '#FFFFFF',      // Blanc pur pour les cartes
+    chat: '#F1F5F9',      // Fond chat moderne
+    input: '#F8FAFC',     // Fond zone de saisie
+    glass: 'rgba(255, 255, 255, 0.25)', // Glassmorphism
+    glassDark: 'rgba(0, 0, 0, 0.1)', // Glassmorphism sombre
   },
   
-  // Textes avec bonne lisibilité
+  // Textes avec hiérarchie moderne
   text: {
-    primary: '#2D3748',   // Gris foncé principal
-    secondary: '#4A5568', // Gris moyen
-    tertiary: '#718096',  // Gris clair
-    white: '#FFFFFF',     // Blanc pour texte sur fond sombre
-    muted: '#A0AEC0',     // Gris très clair
+    primary: '#0F172A',   // Slate très foncé
+    secondary: '#475569', // Slate moyen
+    tertiary: '#64748B',  // Slate clair
+    white: '#FFFFFF',     // Blanc pur
+    muted: '#94A3B8',     // Slate très clair
+    accent: '#6366F1',    // Couleur d'accent
   },
   
-  // Couleurs fonctionnelles
+  // Couleurs fonctionnelles modernes
   status: {
-    online: '#38A169',    // Vert pour en ligne
-    offline: '#9CA3AF',   // Gris pour hors ligne
-    typing: '#ED8936',    // Orange pour frappe
-    typingBg: '#F7FAFC',  // Fond pour indicateur de frappe
-    typingDot: '#4A5568', // Couleur des points de frappe
-    error: '#E53E3E',     // Rouge pour erreurs
-    warning: '#D69E2E',   // Jaune pour avertissements
-    success: '#38A169',   // Vert pour succès
+    online: '#10B981',    // Émeraude pour en ligne
+    offline: '#6B7280',   // Gris pour hors ligne
+    typing: '#F59E0B',    // Ambre pour frappe
+    typingBg: '#FEF3C7',  // Fond ambre clair
+    typingDot: '#D97706', // Points de frappe
+    error: '#EF4444',     // Rouge moderne
+    warning: '#F59E0B',   // Ambre pour avertissements
+    success: '#10B981',   // Émeraude pour succès
+    info: '#3B82F6',      // Bleu pour info
   },
   
-  // Messages
+  // Messages avec design moderne
   message: {
-    sent: '#D4EDDA',      // Vert très clair pour messages envoyés
+    sent: '#E0E7FF',      // Indigo très clair pour messages envoyés
     received: '#FFFFFF',  // Blanc pour messages reçus
-    border: '#E2E8F0',    // Bordure claire
-    shadow: 'rgba(0, 0, 0, 0.1)', // Ombre légère
+    border: '#E2E8F0',    // Bordure subtile
+    shadow: 'rgba(99, 102, 241, 0.1)', // Ombre colorée
+    gradient: ['#E0E7FF', '#F3F4F6'], // Dégradé message
   },
   
-  // Éléments d'interface
+  // Éléments d'interface modernes
   ui: {
-    border: '#E2E8F0',    // Bordures claires
-    shadow: 'rgba(0, 0, 0, 0.1)', // Ombres
-    overlay: 'rgba(0, 0, 0, 0.5)', // Overlay pour modaux
-    divider: '#EDF2F7',   // Lignes de séparation
+    border: '#E2E8F0',    // Bordures subtiles
+    shadow: 'rgba(15, 23, 42, 0.08)', // Ombres douces
+    overlay: 'rgba(0, 0, 0, 0.4)', // Overlay moderne
+    divider: '#F1F5F9',   // Lignes de séparation
+    glass: 'rgba(255, 255, 255, 0.1)', // Glassmorphism
+  },
+  
+  // Thème sombre
+  dark: {
+    primary: '#818CF8',   // Indigo clair pour le sombre
+    background: '#0F172A', // Slate très foncé
+    card: '#1E293B',      // Slate foncé
+    text: '#F8FAFC',      // Blanc cassé
+    textSecondary: '#CBD5E1', // Gris clair
+    border: '#334155',    // Bordure sombre
   }
 };

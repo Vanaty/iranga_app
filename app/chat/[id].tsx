@@ -1,43 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  StatusBar,
-} from 'react-native';
-import { useLocalSearchParams, Link, router } from 'expo-router';
-import { Message, MessageType, Chat, InstantMessage } from '@/types/chat';
-import { chatAPI } from '@/services/api';
-import { StorageService } from '@/services/storage';
-import { useAuth } from '@/contexts/AuthContext';
-import { useChat } from '@/contexts/ChatContext';
-import { MessageBubble } from '@/components/MessageBubble';
+import { AnimatedView } from '@/components/AnimatedView';
 import { ChatInput } from '@/components/ChatInput';
-import { ArrowLeft, Phone, Video, MoreVertical, Circle, UsersIcon } from 'lucide-react-native';
-import { FileUploadService } from '@/services/fileUpload';
 import { FileUploadProgress } from '@/components/FileUploadProgress';
-import { Colors } from '@/constants/Colors';
+import { MessageBubble } from '@/components/MessageBubble';
 import TypingIndicator from '@/components/messages/TypingIndicator';
+import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCall } from '@/contexts/CallContext';
+import { useChat } from '@/contexts/ChatContext';
+import { chatAPI } from '@/services/api';
+import { FileUploadService } from '@/services/fileUpload';
+import { StorageService } from '@/services/storage';
+import { Chat, Message, MessageType } from '@/types/chat';
+import { Link, router, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Circle, MoreVertical, Phone, UsersIcon, Video } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isLoading, setIsLoading] = useState(false);
   const [chatInfo, setChatInfo] = useState<Chat | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<Array<{
+  const [uploadingFiles, setUploadingFiles] = useState<{
     id: string;
     name: string;
     progress: number;
     status: 'uploading' | 'success' | 'error';
     error?: string;
-  }>>([]);
+  }[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
-  const { typingUser, messages: contextMessages, setChatMessages, webSocketService, markMessageAsRead } = useChat();
+  const { typingUser, messages: contextMessages, setChatMessages, addMessage, webSocketService, markMessageAsRead } = useChat();
   const { startCall } = useCall();
   const chatId = parseInt(id as string, 10);
   const [messages, setMessages] = useState<Message[]>(contextMessages[chatId] || []);
@@ -79,12 +80,16 @@ export default function ChatScreen() {
   }, [contextMessages]);
 
   const markReadMessages = () => {
-    if (user && chatId) {
-      messages.forEach(message => {
-        if (!message.read && message.sender.id !== user.id) {
-          markMessageAsRead(chatId, message.id);
-        }
-      });
+    if (user && chatId && messages.length > 0) {
+      try {
+        messages.forEach(message => {
+          if (!message.read && message.sender.id !== user.id) {
+            markMessageAsRead(chatId, message.id);
+          }
+        });
+      } catch (error) {
+        console.warn('Error marking messages as read:', error);
+      }
     }
   };
 
@@ -122,23 +127,48 @@ export default function ChatScreen() {
 
   const handleSendMessage = (text: string) => {
     if (!user || !chatInfo || text.length === 0) return;
-    if (webSocketService) {
-      const messageData = {
-        content: text,
-        sender: user.id,
-        receiver: chatId,
-        messageType: MessageType.TEXT,
-      };
-      webSocketService.sendMessage(chatId, messageData);
+    
+    try {
+      if (webSocketService && webSocketService.isWebSocketConnected()) {
+        const messageData = {
+          content: text,
+          sender: user.id,
+          receiver: chatId,
+          messageType: MessageType.TEXT,
+        };
+        const message: Message = {
+          id: 0, // ID temporaire pour l'affichage optimiste
+          contentText: text,
+          sender: user,
+          chat: { id: chatId } as Chat,
+          timestamp: new Date().toISOString(),
+          type: MessageType.TEXT,
+          sent: false,
+          read: false,
+        };
+        addMessage(message);
+        webSocketService.sendMessage(chatId, messageData);
+      }
+      
+      setTimeout(() => {
+        try {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        } catch (error) {
+          console.warn('Error scrolling to offset:', error);
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    }, 100);
   };
 
   const handleTyping = (typing: boolean) => {
-    if (webSocketService) {
-      webSocketService.sendTypingStatus(chatId, typing);
+    try {
+      if (webSocketService && webSocketService.isWebSocketConnected()) {
+        webSocketService.sendTypingStatus(chatId, typing);
+      }
+    } catch (error) {
+      console.warn('Error sending typing status:', error);
     }
   };
 
@@ -166,33 +196,42 @@ export default function ChatScreen() {
           ));
         },
         onSuccess: (uploadResponse) => {
-          // Créer un message avec le fichier pour affichage optimiste
-          const messageType = file.type === 'image' ? MessageType.IMAGE : 
-                             file.type === 'video' ? MessageType.VIDEO : MessageType.FILE;
+          try {
+            // Créer un message avec le fichier pour affichage optimiste
+            const messageType = file.type === 'image' ? MessageType.IMAGE : 
+                               file.type === 'video' ? MessageType.VIDEO : MessageType.FILE;
 
-          // Envoyer via WebSocket - sera persisté au retour
-          if (webSocketService) {
-            const messageData = {
-              content: '',
-              fileUrl: uploadResponse.fileDownloadUri,
-              thumbnailUrl: uploadResponse.fileThumbnailUri,
-              sender: user.id,
-              receiver: chatId,
-              type: messageType,
-            };
-            webSocketService.sendMessage(chatId, messageData);
+            // Envoyer via WebSocket
+            if (webSocketService && webSocketService.isWebSocketConnected()) {
+              const messageData = {
+                content: '',
+                fileUrl: uploadResponse.fileDownloadUri,
+                thumbnailUrl: uploadResponse.fileThumbnailUri,
+                sender: user.id,
+                receiver: chatId,
+                type: messageType,
+              };
+              webSocketService.sendMessage(chatId, messageData);
+            }
+
+            setUploadingFiles(prev => prev.map(upload => 
+              upload.id === uploadId 
+                ? { ...upload, status: 'success', progress: 100 }
+                : upload
+            ));
+
+            // Supprimer l'upload après 2 secondes
+            setTimeout(() => {
+              setUploadingFiles(prev => prev.filter(upload => upload.id !== uploadId));
+            }, 2000);
+          } catch (wsError) {
+            console.warn('Error sending file via WebSocket:', wsError);
+            setUploadingFiles(prev => prev.map(upload => 
+              upload.id === uploadId 
+                ? { ...upload, status: 'error', error: 'Erreur lors de l\'envoi' }
+                : upload
+            ));
           }
-
-          setUploadingFiles(prev => prev.map(upload => 
-            upload.id === uploadId 
-              ? { ...upload, status: 'success', progress: 100 }
-              : upload
-          ));
-
-          // Supprimer l'upload après 2 secondes
-          setTimeout(() => {
-            setUploadingFiles(prev => prev.filter(upload => upload.id !== uploadId));
-          }, 2000);
         },
         onError: (error) => {
           setUploadingFiles(prev => prev.map(upload => 
@@ -204,6 +243,11 @@ export default function ChatScreen() {
       });
     } catch (error) {
       console.error('Erreur lors de l\'upload:', error);
+      setUploadingFiles(prev => prev.map(upload => 
+        upload.id === uploadId 
+          ? { ...upload, status: 'error', error: 'Erreur lors de l\'upload' }
+          : upload
+      ));
     }
   };
 
@@ -241,11 +285,13 @@ export default function ChatScreen() {
       new Date(item.timestamp).getTime() - new Date(nextMessage.timestamp).getTime() > 300000; // 5 minutes
 
     return (
-      <MessageBubble
-        message={item}
-        isMyMessage={isMyMessage}
-        showTimestamp={showTimestamp}
-      />
+      <AnimatedView animation="slideUp" delay={index * 50}>
+        <MessageBubble
+          message={item}
+          isMyMessage={isMyMessage}
+          showTimestamp={showTimestamp}
+        />
+      </AnimatedView>
     );
   };
 
@@ -276,14 +322,6 @@ export default function ChatScreen() {
       Alert.alert('Information', 'Les appels ne sont pas disponibles pour les chats de groupe');
     }
   };
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Chargement...</Text>
-      </View>
-    );
-  }
 
   if (!user) {
     return (

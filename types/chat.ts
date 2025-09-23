@@ -40,6 +40,7 @@ export interface Message {
   media?: Media;
   sender: User;
   chat: Chat;
+  sent?: boolean;
   read: boolean;
 }
 
@@ -48,6 +49,7 @@ export interface InstantMessage {
   content: string;
   sender: number;
   receiver: number;
+  timestamp: string;
   messageType: MessageType;
 }
 

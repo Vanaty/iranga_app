@@ -556,3 +556,144 @@ Développé dans le cadre d'un stage de développement mobile React Native.
 - Navigation via Link pour les performances
 - Gestion d'erreurs systematique
 - Tests unitaires pour la logique métier
+
+# IrangaMg - React Native App
+
+## Description
+IrangaMg est une application mobile développée avec React Native et Expo, intégrant des fonctionnalités de communication et de gestion d'appels.
+
+## Prérequis
+- Node.js (version 18 ou supérieure)
+- npm ou yarn
+- Expo CLI
+- Android Studio (pour le développement Android)
+- Xcode (pour le développement iOS, sur macOS uniquement)
+
+## Installation
+
+1. Cloner le repository
+```bash
+git clone <repository-url>
+cd iranga_app
+```
+
+2. Installer les dépendances
+```bash
+npm install
+# ou
+yarn install
+```
+
+## Configuration
+
+### Fichiers de configuration requis
+- `google-services.json` : Fichier de configuration Firebase pour Android
+- Icônes dans `./assets/images/` :
+  - `notification-icon.png`
+  - `adaptive-icon.png`
+  - `favicon.png`
+
+### Permissions Android
+L'application nécessite plusieurs permissions critiques :
+- `CAMERA` : Pour la capture photo/vidéo
+- `RECORD_AUDIO` : Pour l'enregistrement audio
+- `READ_PHONE_STATE` : Pour la gestion des appels
+- `BIND_TELECOM_CONNECTION_SERVICE` : Pour le service de connexion télécom
+
+### Service VoiceConnectionService
+Pour la gestion des appels VoIP, ajouter dans `android/app/src/main/AndroidManifest.xml` :
+
+```xml
+<uses-permission android:name="android.permission.BIND_TELECOM_CONNECTION_SERVICE" />
+
+<application ... >
+  <service android:name="io.wazo.callkeep.VoiceConnectionService"
+           android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+           android:foregroundServiceType="camera|microphone"
+           android:exported="false">
+    <intent-filter>
+      <action android:name="android.telecom.ConnectionService"/>
+    </intent-filter>
+  </service>
+</application>
+```
+
+## Build et Déploiement
+
+### Développement
+```bash
+# Démarrer le serveur de développement
+npx expo start
+
+# Pour Android
+npx expo run:android
+
+# Pour iOS
+npx expo run:ios
+```
+
+### Build de production
+
+#### Avec EAS Build (recommandé)
+```bash
+# Installation d'EAS CLI
+npm install -g @expo/eas-cli
+
+# Login EAS
+eas login
+
+# Build Android
+eas build --platform android
+
+# Build iOS
+eas build --platform ios
+
+# Build pour les deux plateformes
+eas build --platform all
+```
+
+#### Build local
+```bash
+# Build Android APK
+npx expo build:android
+
+# Build iOS
+npx expo build:ios
+```
+
+### Configuration EAS
+Le projet est configuré avec l'ID : `df61d192-6f4a-48d9-b5b5-7d074c9c7a4e`
+
+## Structure du projet
+```
+iranga_app/
+├── app/                    # Pages et routing (Expo Router)
+├── assets/
+│   └── images/            # Icônes et images
+├── components/            # Composants réutilisables
+├── constants/             # Constantes de l'app
+├── hooks/                 # Custom hooks
+├── app.json              # Configuration Expo
+├── google-services.json  # Config Firebase Android
+└── README.md
+```
+
+## Fonctionnalités principales
+- Interface utilisateur adaptative (clair/sombre)
+- Notifications push
+- Gestion d'appels VoIP
+- Support tablet iOS
+- Architecture moderne avec New Architecture activée
+
+## Bundle Identifiers
+- **Android**: `mg.adiresiko.irangamg`
+- **iOS**: `mg.adiresiko.irangamg`
+
+## Déploiement
+- **Scheme**: `irangamg`
+- **Version**: 1.0.0
+
+## Support
+- Orientation : Portrait uniquement
+- Plateformes : iOS, Android, Web
+- TypeScript avec routes typées

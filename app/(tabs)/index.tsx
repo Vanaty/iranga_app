@@ -4,7 +4,7 @@ import { useChat } from '@/contexts/ChatContext';
 import { StorageService } from '@/services/storage';
 import { Chat } from '@/types/chat';
 import { useRouter } from 'expo-router';
-import { MessageCircle, Plus, Users as UsersIcon } from 'lucide-react-native';
+import { MessageCircle, Plus, Users as UsersIcon, Search } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -14,7 +14,11 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ModernCard } from '@/components/ModernCard';
+import { ModernButton } from '@/components/ModernButton';
 import { GroupChatCreation } from '@/components/GroupChatCreation';
 
 export default function ChatsScreen() {
@@ -22,6 +26,8 @@ export default function ChatsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastMessages, setLastMessages] = useState<{ [chatId: number]: any }>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const { isConnected, webSocketService } = useChat();
   const router = useRouter();
   const { user } = useAuth();
@@ -31,6 +37,18 @@ export default function ChatsScreen() {
     if (!isConnected || !webSocketService) return;
     loadLastMessages();
   }, [chats]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = chats.filter(chat => {
+        const displayName = getChatDisplayName(chat);
+        return displayName.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+      setFilteredChats(filtered);
+    } else {
+      setFilteredChats(chats);
+    }
+  }, [searchQuery, chats]);
 
   const loadLastMessages = async () => {
     const lastMessagesData: { [chatId: number]: any } = {};
@@ -71,64 +89,67 @@ export default function ChatsScreen() {
     const lastMessage = lastMessages[item.id];
 
     return (
-      <TouchableOpacity
+      <ModernCard
+        variant="elevated"
+        padding="medium"
+        borderRadius="large"
         style={styles.chatItem}
         onPress={() => navigateToChat(item.id)}
       >
-        <View style={styles.avatarContainer}>
-          {item.isGroupChat ? (
-            <View style={styles.groupAvatar}>
-              <UsersIcon size={24} color={Colors.primary.main} />
-            </View>
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {otherUser?.firstName?.charAt(0)?.toUpperCase() || '?'}
+        <View style={styles.chatContent}>
+          <View style={styles.avatarContainer}>
+            {item.isGroupChat ? (
+              <View style={styles.groupAvatar}>
+                <UsersIcon size={24} color={Colors.primary.main} />
+              </View>
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {otherUser?.firstName?.charAt(0)?.toUpperCase() || '?'}
+                </Text>
+              </View>
+            )}
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.chatInfo}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.timestamp}>
+                {lastMessage
+                  ? new Date(lastMessage.timestamp).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
+                  : new Date(item.createdAt).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
+                }
               </Text>
             </View>
-          )}
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
-            </View>
-          )}
+            <Text style={[
+              styles.chatPreview,
+              unreadCount > 0 && styles.unreadPreview
+            ]} numberOfLines={2}>
+              {lastMessage
+                ? lastMessage.content.length > 50
+                  ? `${lastMessage.content.substring(0, 50)}...`
+                  : lastMessage.content
+                : item.isGroupChat
+                  ? `${item.participants.length} participants`
+                  : '@' + otherUser?.role?.libelle
+              }
+            </Text>
+          </View>
         </View>
-        <View style={styles.chatInfo}>
-          <Text style={styles.chatName}>{displayName}</Text>
-          <Text style={[
-            styles.chatPreview,
-            unreadCount > 0 && styles.unreadPreview
-          ]}>
-            {lastMessage
-              ? lastMessage.content.length > 50
-                ? `${lastMessage.content.substring(0, 50)}...`
-                : lastMessage.content
-              : item.isGroupChat
-                ? `${item.participants.length} participants`
-                : '@' + otherUser?.role?.libelle
-            }
-          </Text>
-        </View>
-        <View style={styles.chatMeta}>
-          <Text style={styles.timestamp}>
-            {lastMessage
-              ? new Date(lastMessage.timestamp).toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-              })
-              : new Date(item.createdAt).toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-              })
-            }
-          </Text>
-          {unreadCount > 0 && (
-            <View style={styles.unreadIndicator} />
-          )}
-        </View>
-      </TouchableOpacity>
+      </ModernCard>
     );
   };
 
@@ -172,33 +193,80 @@ export default function ChatsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Discussions</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={showCreateOptions}
-        >
-          <Plus size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      <LinearGradient
+        colors={Colors.primary.gradient as [string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Discussions</Text>
+          <ModernButton
+            title=""
+            onPress={showCreateOptions}
+            variant="ghost"
+            size="small"
+            icon={<Plus size={20} color={Colors.text.white} />}
+            style={styles.addButton}
+          />
+        </View>
+        
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Search size={20} color={Colors.text.muted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Rechercher une conversation..."
+              placeholderTextColor={Colors.text.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                style={styles.clearButton}
+              >
+                <Text style={styles.clearText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </LinearGradient>
 
-      {chats.length === 0 ? (
+      {filteredChats.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <MessageCircle size={64} color="#9CA3AF" />
-          <Text style={styles.emptyText}>Aucune discussion</Text>
-          <Text style={styles.emptySubtext}>
-            Commencez une nouvelle conversation
-          </Text>
+          <ModernCard variant="glass" padding="large" borderRadius="xl" style={styles.emptyCard}>
+            <MessageCircle size={64} color={Colors.text.muted} />
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'Aucun résultat trouvé' : 'Aucune discussion'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery 
+                ? 'Essayez avec d\'autres mots-clés'
+                : 'Commencez une nouvelle conversation'
+              }
+            </Text>
+            {!searchQuery && (
+              <ModernButton
+                title="Nouvelle conversation"
+                onPress={showCreateOptions}
+                variant="outline"
+                style={styles.emptyButton}
+                icon={<Plus size={16} color={Colors.primary.main} style={{ marginRight: 8 }} />}
+              />
+            )}
+          </ModernCard>
         </View>
       ) : (
         <FlatList
-          data={chats}
+          data={filteredChats}
           renderItem={renderChatItem}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
@@ -217,64 +285,70 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   header: {
+    paddingTop: 10,
+    paddingBottom: 20,
+    paddingHorizontal: 10,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
-    borderBottomLeftRadius: 5,
-    borderBottomRightRadius: 5,
-    backgroundColor: Colors.primary.main,
-    elevation: 8,
-    shadowColor: Colors.ui.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    marginBottom: 20,
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '600',
+    fontWeight: '500',
     color: Colors.text.white,
-    letterSpacing: 0.5,
+    // letterSpacing: -0.5,
   },
   addButton: {
-    backgroundColor: Colors.primary.accent,
-    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
     width: 40,
     height: 40,
-    margin: 5,
-    justifyContent: 'center',
+  },
+  searchContainer: {
+    marginTop: -5,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: Colors.ui.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text.white,
+    fontWeight: '500',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearText: {
+    color: Colors.text.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
   listContainer: {
     padding: 20,
-    paddingTop: 25,
+    paddingTop: 20,
   },
   chatItem: {
+    marginBottom: 16,
+  },
+  chatContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background.card,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 12,
-    borderRadius: 20,
-    elevation: 3,
-    shadowColor: Colors.ui.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary.light,
   },
   avatarContainer: {
     marginRight: 16,
+    position: 'relative',
   },
   avatar: {
     width: 56,
@@ -285,9 +359,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 2,
     shadowColor: Colors.ui.shadow,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   avatarText: {
     color: Colors.text.white,
@@ -297,20 +371,24 @@ const styles = StyleSheet.create({
   chatInfo: {
     flex: 1,
   },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   chatName: {
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
-    marginBottom: 4,
-    letterSpacing: 0.3,
+    flex: 1,
+    marginRight: 8,
   },
   chatPreview: {
     fontSize: 15,
     color: Colors.text.secondary,
     fontWeight: '500',
-  },
-  chatMeta: {
-    alignItems: 'flex-end',
+    lineHeight: 20,
   },
   timestamp: {
     fontSize: 12,
@@ -322,21 +400,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    backgroundColor: Colors.background.primary,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    maxWidth: 300,
   },
   emptyText: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     marginTop: 20,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 16,
-    color: Colors.text.tertiary,
+    color: Colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 24,
+  },
+  emptyButton: {
+    marginTop: 8,
   },
   groupAvatar: {
     width: 56,
@@ -369,12 +454,5 @@ const styles = StyleSheet.create({
   unreadPreview: {
     fontWeight: '700',
     color: Colors.text.primary,
-  },
-  unreadIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary.main,
-    marginTop: 4,
   },
 });

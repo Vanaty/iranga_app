@@ -1,43 +1,55 @@
+import { Colors } from '@/constants/Colors';
+import { useCall } from '@/contexts/CallContext';
+import { router } from 'expo-router';
+import {
+  Mic,
+  MicOff,
+  Minimize2,
+  PhoneOff,
+  RotateCcw,
+  Video,
+  VideoOff,
+  Volume2,
+  VolumeX
+} from 'lucide-react-native';
 import React, { useEffect } from 'react';
 import {
-  View,
+  Dimensions,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  StatusBar,
-  Dimensions,
+  View,
 } from 'react-native';
-import { router } from 'expo-router';
+import InCallManager from 'react-native-incall-manager';
 import { RTCView } from 'react-native-webrtc';
-import { useCall } from '@/contexts/CallContext';
-import { 
-  Phone, 
-  PhoneOff, 
-  Mic, 
-  MicOff, 
-  Video, 
-  VideoOff,
-  RotateCcw,
-  Minimize2 
-} from 'lucide-react-native';
-import { Colors } from '@/constants/Colors';
 
 const { width, height } = Dimensions.get('window');
 
 export default function VideoCallScreen() {
   const {
-    isCallActive,
-    callData,
     localStream,
     remoteStream,
     isMuted,
     isCameraOff,
     isCallConnected,
+    callData,
     endCall,
     toggleMute,
     toggleCamera,
     switchCamera,
   } = useCall();
+
+  const [speakerOn, setSpeakerOn] = React.useState(callData?.type === 'video');
+
+  useEffect(() => {
+    InCallManager.start();
+    InCallManager.setKeepScreenOn(true);
+    InCallManager.setForceSpeakerphoneOn(speakerOn);
+    return () => {
+      InCallManager.stop();
+    };
+  }, []);
 
   useEffect(() => {
     if (!localStream && !remoteStream) {
@@ -46,10 +58,17 @@ export default function VideoCallScreen() {
       console.log('Navigated back due to no active streams');
       return;
     }
-    if (remoteStream) {
-      console.error('Remote Stream Set');
-    }
   }, [localStream, remoteStream]);
+
+  const toggleSpeaker = () => {
+    if (speakerOn) {
+      InCallManager.setForceSpeakerphoneOn(false);
+      setSpeakerOn(false);
+    } else {
+      InCallManager.setForceSpeakerphoneOn(true);
+      setSpeakerOn(true);
+    }
+  };
 
   const handleEndCall = async () => {
     await endCall();
@@ -66,7 +85,7 @@ export default function VideoCallScreen() {
       <StatusBar backgroundColor="#000" barStyle="light-content" />
       
       {/* Remote video (main view) */}
-      {remoteStream && isCallConnected ? (
+      {remoteStream ? (
         <RTCView
           style={styles.remoteVideo}
           streamURL={remoteStream.toURL()}
@@ -113,6 +132,13 @@ export default function VideoCallScreen() {
           ) : (
             <Mic size={28} color="#FFFFFF" />
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={toggleSpeaker}
+          style={[styles.controlButton, !speakerOn && styles.controlButtonActive]}
+        >
+          {speakerOn ? <Volume2 size={28} color="black" /> : <VolumeX size={28} color="white" />}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -207,13 +233,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   controlButton: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 15,
+    marginHorizontal: 5,
   },
   controlButtonActive: {
     backgroundColor: Colors.status.error,

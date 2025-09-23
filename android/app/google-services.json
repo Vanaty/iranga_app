@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "327166693784",
+    "project_id": "iranga-mg",
+    "storage_bucket": "iranga-mg.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:327166693784:android:574c289df4a7e95a69dbed",
+        "android_client_info": {
+          "package_name": "mg.adiresiko.irangamg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMQGLkVcVWkB-pIiVCKqZOImkYyaL8KLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

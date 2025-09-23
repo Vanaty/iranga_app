@@ -47,6 +47,7 @@ export function MessageBubble({ message, isMyMessage, showTimestamp = true }: Me
         <TextMessage
           message={message}
           isMyMessage={isMyMessage}
+          sent={message.sent}
           showTimestamp={showTimestamp}
         />
       );

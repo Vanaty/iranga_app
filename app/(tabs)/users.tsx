@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    height: 60,
     paddingHorizontal: 20,
     paddingBottom: 10,
     backgroundColor: Colors.primary.main,
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '600',
+    fontWeight: '500',
     color: Colors.text.white,
     letterSpacing: 0.5,
   },

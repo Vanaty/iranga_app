@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Publication, Message, Chat, User, Comment as CommentType } from '@/types/chat';
-import { WebSocketService } from '@/services/websocket';
-import { publicationAPI, chatAPI } from '@/services/api';
+import { chatAPI, publicationAPI } from '@/services/api';
 import { NotificationService } from '@/services/notifications';
 import { StorageService } from '@/services/storage';
+import { WebSocketService } from '@/services/websocket';
+import { Chat, Message, Publication } from '@/types/chat';
+import { navigate } from 'expo-router/build/global-state/routing';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 
 interface ChatContextType {
@@ -45,6 +46,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated && user) {
       loadInitialData();
       initializeWebSocket();
+      setNotificationClick();
     } else {
       disconnectWebSocket();
     }
@@ -62,23 +64,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setUnreadMessages(Object.values(unreadCounts).reduce((a, b) => a + b, 0));
     setUnreadByChat(unreadCounts);
   }, [messages, user]);
-
-    useEffect(() => {
-      if (webSocketService?.isWebSocketConnected()) {
-        console.log('Subscribing to chat updates via WebSocket', chats);
-        const unsubscribes: (() => void)[] = [];
-    
-        chats.forEach(chat => {
-          const unsubscribe = webSocketService.subscribeToChat(chat.id);
-          unsubscribes.push(unsubscribe);
-        });
-    
-        return () => {
-          unsubscribes.forEach(unsub => unsub());
-        };
-      }
-  }, [chats, webSocketService?.isWebSocketConnected()]);
-
+  
   const loadInitialData = async () => {
     try {
       await Promise.all([
@@ -89,6 +75,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.error('Error loading initial data:', error);
     }
   };
+
+  const setNotificationClick =  async () => {
+    NotificationService.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data?.chatId && data?.type === 'message') {
+        navigate(`/chat/${data.chatId}`);
+      }
+    });
+  }
 
   const refreshPublications = async () => {
     try {
@@ -172,19 +167,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const handleNewMessage = async (message: Message) => {
-    setMessages(prev => ({
+    setMessages(prev => {
+      const currentMessages = prev[message.chat.id] || [];
+      const updatedMessages = [message, ...currentMessages].filter(msg => msg.id !== 0);
+      return {
       ...prev,
-      [message.chat.id]: [message, ...(prev[message.chat.id] || [])],
-    }));
+      [message.chat.id]: updatedMessages,
+      };
+    });
     try {
       await StorageService.addMessage(message.chat.id, message);
-      
-      if (message.sender.id === user?.id) return;
-      await NotificationService.scheduleLocalNotification(
-        `${message.sender.firstName} ${message.sender.lastName}`,
-        message.contentText,
-        { chatId: message.chat.id, messageId: message.id }
-      );
     } catch (error) {
       console.error('Error storing WebSocket message:', error);
     }
@@ -208,15 +200,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           : pub
       )
     );
-
-    // Show notification if comment is not from current user
-    if (comment.author.id !== user?.id) {
-      await NotificationService.scheduleLocalNotification(
-        `${comment.author.firstName} ${comment.author.lastName}`,
-        `A commenté votre publication: ${comment.content.substring(0, 50)}...`,
-        { publicationId: comment.publication.id, commentId: comment.id }
-      );
-    }
   };
 
   const addPublication = (publication: Publication) => {

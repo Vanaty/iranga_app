@@ -1,7 +1,7 @@
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 // Configuration des notifications
 Notifications.setNotificationHandler({
@@ -13,12 +13,45 @@ Notifications.setNotificationHandler({
   }),
 });
 
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data;
+
+    // Si c'est un appel → pas d'UI
+    if (data?.type === 'incoming_call') {
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    if(data?.type === 'message' && data?.showNotification === false) {
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    // Pour les autres → montrer la notif
+    return {
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
+});
+
+
 export class NotificationService {
   static async registerForPushNotificationsAsync(): Promise<string | undefined> {
     let token;
 
     const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    console.log('EAS Project ID:', projectId);
     if (!Device.isDevice) {
       console.log('Push notifications not available in Expo Go simulator');
       return;

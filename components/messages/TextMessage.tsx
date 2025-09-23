@@ -7,10 +7,11 @@ import { Colors } from '@/constants/Colors';
 interface TextMessageProps {
   message: Message;
   isMyMessage: boolean;
+  sent?: boolean;
   showTimestamp?: boolean;
 }
 
-export function TextMessage({ message, isMyMessage, showTimestamp = true }: TextMessageProps) {
+export function TextMessage({ message, isMyMessage, sent=true, showTimestamp = true }: TextMessageProps) {
   const messageTime = new Date(message.timestamp).toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
@@ -52,7 +53,7 @@ export function TextMessage({ message, isMyMessage, showTimestamp = true }: Text
           )}
           {isMyMessage && (
             <MessageStatus 
-              sent={true}
+              sent={sent ?? true}
               delivered={message.read}
               read={message.read}
             />
